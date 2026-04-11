@@ -499,7 +499,17 @@ func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 		return err
 	}
 
-	filtered := filterPortfolioPositions(response.Positions, chainArg, protocol, asset)
+	filtered := response.Positions
+	if chainArg != "" {
+		chain, err := rt.resolveChain(ctx, chainArg)
+		if err == nil {
+			filtered = filterPortfolioPositions(filtered, []string{chainArg, chain.Name, chain.Key, strconv.Itoa(chain.ID)}, protocol, asset)
+		} else {
+			filtered = filterPortfolioPositions(filtered, []string{chainArg}, protocol, asset)
+		}
+	} else {
+		filtered = filterPortfolioPositions(filtered, nil, protocol, asset)
+	}
 	if cfg.Global.JSON {
 		return writeJSON(filtered)
 	}
@@ -728,8 +738,14 @@ func recommendationScore(vault earn.Vault, strategy string) float64 {
 	}
 }
 
-func filterPortfolioPositions(positions []map[string]any, chainArg, protocol, asset string) []map[string]any {
-	needleChain := normalizeLookup(chainArg)
+func filterPortfolioPositions(positions []map[string]any, chainNeedles []string, protocol, asset string) []map[string]any {
+	normalizedChains := make([]string, 0, len(chainNeedles))
+	for _, chain := range chainNeedles {
+		needle := normalizeLookup(chain)
+		if needle != "" {
+			normalizedChains = append(normalizedChains, needle)
+		}
+	}
 	needleProtocol := normalizeLookup(protocol)
 	needleAsset := normalizeLookup(asset)
 	filtered := make([]map[string]any, 0, len(positions))
@@ -739,8 +755,17 @@ func filterPortfolioPositions(positions []map[string]any, chainArg, protocol, as
 			continue
 		}
 		text := normalizeLookup(string(blob))
-		if needleChain != "" && !strings.Contains(text, needleChain) {
-			continue
+		if len(normalizedChains) > 0 {
+			matched := false
+			for _, needleChain := range normalizedChains {
+				if strings.Contains(text, needleChain) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
 		}
 		if needleProtocol != "" && !strings.Contains(text, needleProtocol) {
 			continue
