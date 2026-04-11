@@ -28,21 +28,35 @@ type GlobalOptions struct {
 	NoColor    bool
 }
 
+type apiConfig struct {
+	LifiAPIKey string `yaml:"lifi_api_key"`
+}
+
+type defaultsConfig struct {
+	FromChain   string `yaml:"from_chain"`
+	SlippageBPS string `yaml:"slippage_bps"`
+	Output      string `yaml:"output"`
+}
+
+type walletConfig struct {
+	Address       string `yaml:"address"`
+	PrivateKeyEnv string `yaml:"private_key_env"`
+}
+
+type profileConfig struct {
+	API      apiConfig         `yaml:"api"`
+	Defaults defaultsConfig    `yaml:"defaults"`
+	Wallet   walletConfig      `yaml:"wallet"`
+	RPCs     map[string]string `yaml:"rpcs"`
+}
+
 type fileConfig struct {
-	Profile string `yaml:"profile"`
-	API     struct {
-		LifiAPIKey string `yaml:"lifi_api_key"`
-	} `yaml:"api"`
-	Defaults struct {
-		FromChain   string `yaml:"from_chain"`
-		SlippageBPS string `yaml:"slippage_bps"`
-		Output      string `yaml:"output"`
-	} `yaml:"defaults"`
-	Wallet struct {
-		Address       string `yaml:"address"`
-		PrivateKeyEnv string `yaml:"private_key_env"`
-	} `yaml:"wallet"`
-	RPCs map[string]string `yaml:"rpcs"`
+	Profile  string                   `yaml:"profile"`
+	API      apiConfig                `yaml:"api"`
+	Defaults defaultsConfig           `yaml:"defaults"`
+	Wallet   walletConfig             `yaml:"wallet"`
+	RPCs     map[string]string        `yaml:"rpcs"`
+	Profiles map[string]profileConfig `yaml:"profiles"`
 }
 
 type Config struct {
@@ -50,19 +64,19 @@ type Config struct {
 	ResolvedConfigPath string
 	DotEnvPath         string
 	FileConfig         fileConfig
+	ProfileName        string
+	SelectedProfile    profileConfig
+	AvailableProfiles  []string
 	APIKey             string
 	WalletPrivateKey   string
 	WalletAddress      string
+	WalletKeyEnvName   string
 	DefaultFromChain   string
 	DefaultSlippageBPS string
 	RPCs               map[string]string
 }
 
 func Load(global GlobalOptions) (*Config, error) {
-	if global.Profile == "" {
-		global.Profile = "default"
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("resolve working directory: %w", err)
@@ -81,24 +95,30 @@ func Load(global GlobalOptions) (*Config, error) {
 		return nil, err
 	}
 
+	profileName, selectedProfile, err := resolveSelectedProfile(global.Profile, fileCfg)
+	if err != nil {
+		return nil, err
+	}
+	global.Profile = profileName
+
 	apiKey := firstNonEmpty(
 		os.Getenv("LIFI_API_KEY"),
-		fileCfg.API.LifiAPIKey,
+		selectedProfile.API.LifiAPIKey,
 	)
 
 	privateKey := firstNonEmpty(
 		os.Getenv("LIFI_WALLET_PRIVATE_KEY"),
 		func() string {
-			if fileCfg.Wallet.PrivateKeyEnv == "" {
+			if selectedProfile.Wallet.PrivateKeyEnv == "" {
 				return ""
 			}
-			return os.Getenv(fileCfg.Wallet.PrivateKeyEnv)
+			return os.Getenv(selectedProfile.Wallet.PrivateKeyEnv)
 		}(),
 	)
 
 	walletAddress := firstNonEmpty(
 		os.Getenv("LIFI_WALLET_ADDRESS"),
-		fileCfg.Wallet.Address,
+		selectedProfile.Wallet.Address,
 	)
 	if walletAddress == "" && privateKey != "" {
 		derived, err := deriveWalletAddress(privateKey)
@@ -112,18 +132,22 @@ func Load(global GlobalOptions) (*Config, error) {
 		ResolvedConfigPath: resolvedPath,
 		DotEnvPath:         dotEnvPath,
 		FileConfig:         fileCfg,
+		ProfileName:        profileName,
+		SelectedProfile:    selectedProfile,
+		AvailableProfiles:  fileCfg.ProfileNames(),
 		APIKey:             apiKey,
 		WalletPrivateKey:   privateKey,
 		WalletAddress:      walletAddress,
+		WalletKeyEnvName:   firstNonEmpty(selectedProfile.Wallet.PrivateKeyEnv, "LIFI_WALLET_PRIVATE_KEY"),
 		DefaultFromChain: firstNonEmpty(
 			os.Getenv("LIFI_DEFAULT_FROM_CHAIN"),
-			fileCfg.Defaults.FromChain,
+			selectedProfile.Defaults.FromChain,
 		),
 		DefaultSlippageBPS: firstNonEmpty(
 			os.Getenv("LIFI_DEFAULT_SLIPPAGE_BPS"),
-			fileCfg.Defaults.SlippageBPS,
+			selectedProfile.Defaults.SlippageBPS,
 		),
-		RPCs: mergeRPCs(fileCfg.RPCs, loadRPCsFromEnv()),
+		RPCs: mergeRPCs(selectedProfile.RPCs, loadRPCsFromEnv()),
 	}
 
 	return cfg, nil
@@ -166,6 +190,9 @@ func loadFileConfig(path string) (fileConfig, error) {
 
 	if cfg.RPCs == nil {
 		cfg.RPCs = map[string]string{}
+	}
+	if cfg.Profiles == nil {
+		cfg.Profiles = map[string]profileConfig{}
 	}
 
 	return cfg, nil
@@ -312,17 +339,80 @@ func (c *Config) LookupRPC(key string) string {
 func DefaultConfigTemplate() string {
 	return strings.TrimSpace(`
 profile: default
-api:
-  lifi_api_key: ""
-defaults:
-  from_chain: base
-  slippage_bps: "50"
-  output: table
-wallet:
-  address: "0x..."
-  private_key_env: "LIFI_WALLET_PRIVATE_KEY"
-rpcs:
-  base: "https://mainnet.base.org"
-  arbitrum: "https://arb1.arbitrum.io/rpc"
-`) + "\n"
+profiles:
+  default:
+    api:
+      lifi_api_key: ""
+    defaults:
+      from_chain: base
+      slippage_bps: "50"
+      output: table
+    wallet:
+      address: "0x..."
+      private_key_env: "LIFI_WALLET_PRIVATE_KEY"
+    rpcs:
+      base: "https://mainnet.base.org"
+      arbitrum: "https://arb1.arbitrum.io/rpc"
+	`) + "\n"
+}
+
+func resolveSelectedProfile(requested string, cfg fileConfig) (string, profileConfig, error) {
+	selectedName := strings.TrimSpace(requested)
+	if selectedName == "" || selectedName == "default" {
+		if strings.TrimSpace(cfg.Profile) != "" {
+			selectedName = strings.TrimSpace(cfg.Profile)
+		} else {
+			selectedName = "default"
+		}
+	}
+
+	base := cfg.rootProfile()
+	if selectedName == "default" {
+		if profile, ok := cfg.Profiles["default"]; ok {
+			return "default", mergeProfile(base, profile), nil
+		}
+		return "default", base, nil
+	}
+
+	profile, ok := cfg.Profiles[selectedName]
+	if !ok {
+		return "", profileConfig{}, fmt.Errorf("profile %q not found", selectedName)
+	}
+	return selectedName, mergeProfile(base, profile), nil
+}
+
+func (c fileConfig) rootProfile() profileConfig {
+	return profileConfig{
+		API:      c.API,
+		Defaults: c.Defaults,
+		Wallet:   c.Wallet,
+		RPCs:     c.RPCs,
+	}
+}
+
+func mergeProfile(base, override profileConfig) profileConfig {
+	merged := base
+	merged.API.LifiAPIKey = firstNonEmpty(override.API.LifiAPIKey, merged.API.LifiAPIKey)
+	merged.Defaults.FromChain = firstNonEmpty(override.Defaults.FromChain, merged.Defaults.FromChain)
+	merged.Defaults.SlippageBPS = firstNonEmpty(override.Defaults.SlippageBPS, merged.Defaults.SlippageBPS)
+	merged.Defaults.Output = firstNonEmpty(override.Defaults.Output, merged.Defaults.Output)
+	merged.Wallet.Address = firstNonEmpty(override.Wallet.Address, merged.Wallet.Address)
+	merged.Wallet.PrivateKeyEnv = firstNonEmpty(override.Wallet.PrivateKeyEnv, merged.Wallet.PrivateKeyEnv)
+	merged.RPCs = mergeRPCs(base.RPCs, override.RPCs)
+	return merged
+}
+
+func (c fileConfig) ProfileNames() []string {
+	names := make([]string, 0, len(c.Profiles)+1)
+	seen := map[string]struct{}{}
+	names = append(names, "default")
+	seen["default"] = struct{}{}
+	for name := range c.Profiles {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

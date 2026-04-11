@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/apperror"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 )
 
@@ -29,8 +30,12 @@ func Run(args []string) int {
 
 	cfg, err := config.Load(global)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		if global.JSON {
+			_ = writeJSON(apperror.JSONPayload(apperror.Wrap("config", apperror.ExitConfig, err)))
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return apperror.ExitConfig
 	}
 
 	if len(remaining) == 0 {
@@ -52,8 +57,13 @@ func Run(args []string) int {
 	}
 
 	if err := cmd.Run(cfg, remaining[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		appErr := apperror.Classify(err)
+		if cfg.Global.JSON {
+			_ = writeJSON(apperror.JSONPayload(appErr))
+		} else {
+			fmt.Fprintln(os.Stderr, appErr.Message)
+		}
+		return appErr.ExitCode()
 	}
 
 	return 0

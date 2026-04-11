@@ -90,11 +90,13 @@ func runConfigShow(cfg *config.Config) error {
 		"config_exists":       cfg.ConfigExists(),
 		"dotenv_path":         cfg.DotEnvPath,
 		"dotenv_exists":       cfg.DotEnvExists(),
-		"profile":             cfg.Global.Profile,
+		"profile":             cfg.ProfileName,
+		"available_profiles":  cfg.AvailableProfiles,
 		"default_from_chain":  cfg.DefaultFromChain,
 		"default_slippagebps": cfg.DefaultSlippageBPS,
 		"wallet_address_set":  cfg.WalletAddress != "",
 		"wallet_key_set":      cfg.WalletPrivateKey != "",
+		"wallet_key_env":      cfg.WalletKeyEnvName,
 		"api_key_set":         cfg.APIKey != "",
 		"rpc_keys":            cfg.RPCKeys(),
 	}
@@ -107,12 +109,14 @@ func runConfigShow(cfg *config.Config) error {
 	fmt.Printf("Config exists:        %t\n", cfg.ConfigExists())
 	fmt.Printf(".env path:            %s\n", cfg.DotEnvPath)
 	fmt.Printf(".env exists:          %t\n", cfg.DotEnvExists())
-	fmt.Printf("Profile:              %s\n", cfg.Global.Profile)
+	fmt.Printf("Profile:              %s\n", cfg.ProfileName)
+	fmt.Printf("Available profiles:   %s\n", formatList(cfg.AvailableProfiles))
 	fmt.Printf("Default from chain:   %s\n", emptyFallback(cfg.DefaultFromChain))
 	fmt.Printf("Default slippage bps: %s\n", emptyFallback(cfg.DefaultSlippageBPS))
 	fmt.Printf("API key set:          %t\n", cfg.APIKey != "")
 	fmt.Printf("Wallet address set:   %t\n", cfg.WalletAddress != "")
 	fmt.Printf("Wallet key set:       %t\n", cfg.WalletPrivateKey != "")
+	fmt.Printf("Wallet key env:       %s\n", emptyFallback(cfg.WalletKeyEnvName))
 	fmt.Printf("RPC keys:             %s\n", formatList(cfg.RPCKeys()))
 	return nil
 }
