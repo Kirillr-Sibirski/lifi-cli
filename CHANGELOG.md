@@ -4,6 +4,25 @@ All notable changes to `lifi` are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-11
+
+- Replaced plain `tabwriter` output with a styled table renderer using box-drawing
+  separators (`│`, `┼`, `─`), bold headers, and color-coded `yes`/`no` cells
+  across all commands.
+- Added a pixel-art cross-chain bridge to the root usage banner alongside the
+  existing LIFI text logo.
+- Improved error messages for missing `--token`, `--chain`, and `--spender`
+  flags — each now includes a usage hint and example invocation.
+- Added fuzzy chain resolution: prefix and substring matching with "did you mean?"
+  suggestions and a link to `lifi chains`.
+- `lifi approve` now validates required flags before making any API calls,
+  with a full usage example in the error output.
+- Rewrote `README.md`: removed all hackathon references, split Earn and Composer
+  into separate sections, added per-command flag tables with required-secrets columns.
+- Annotated `.env.example` with required vs optional comments.
+- Added `docs/configuration.md`, `docs/earn.md`, and `docs/composer.md` for
+  in-depth documentation of all commands and the config system.
+
 ## [0.1.2] - 2026-04-11
 
 - Refreshed the terminal presentation with a larger magenta `li.fi cli`
