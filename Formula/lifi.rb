@@ -1,7 +1,7 @@
 class Lifi < Formula
   desc "CLI for LI.FI Earn and Composer"
   homepage "https://github.com/Kirillr-Sibirski/lifi-cli"
-  license "MIT"
+  license "Apache-2.0"
   url "https://github.com/Kirillr-Sibirski/lifi-cli/archive/refs/tags/v0.1.4.tar.gz"
   sha256 "a51d9d92144ef7bf67b6561e09016a36a286f21ece85babddc074c6e5eb38fed"
   head "https://github.com/Kirillr-Sibirski/lifi-cli.git", branch: "main"
