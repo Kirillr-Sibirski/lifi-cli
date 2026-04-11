@@ -22,6 +22,12 @@ lifi quote \
   --json
 ```
 
+That JSON can also be fed back into:
+
+```bash
+lifi allowance --quote-file /path/to/quote.json --owner 0xYourWallet --json
+```
+
 Run a safe preflight:
 
 ```bash

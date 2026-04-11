@@ -73,18 +73,20 @@ func completionSpecs() map[string][]string {
 			"--vault", "--from-chain", "--to-chain", "--from-token", "--amount",
 			"--amount-wei", "--from-address", "--to-address", "--slippage-bps",
 			"--preset", "--allow-bridges", "--deny-bridges", "--allow-exchanges",
-			"--deny-exchanges", "--json", "--raw",
+			"--deny-exchanges", "--json", "--raw", "--unsigned",
 		},
 		"allowance": {
 			"--chain", "--token", "--owner", "--spender", "--amount", "--quote-file", "--json",
 		},
 		"approve": {
-			"--chain", "--token", "--spender", "--amount", "--yes", "--json",
+			"--chain", "--token", "--spender", "--amount", "--gas-policy", "--yes", "--json",
 		},
 		"deposit": {
 			"--vault", "--from-chain", "--to-chain", "--from-token", "--amount",
 			"--from-address", "--to-address", "--slippage-bps", "--approve",
-			"--wait", "--verify-position", "--yes", "--dry-run", "--json",
+			"--approval-amount", "--gas-policy", "--wait-timeout", "--portfolio-timeout",
+			"--wait", "--verify-position", "--yes", "--dry-run", "--simulate",
+			"--skip-simulate", "--json",
 		},
 		"portfolio": {
 			"--chain", "--protocol", "--asset", "--json",

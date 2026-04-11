@@ -228,6 +228,13 @@ func readQuoteFile(path string) (*lifiapi.Quote, error) {
 		return nil, err
 	}
 
+	var wrapped struct {
+		Quote *lifiapi.Quote `json:"quote"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err == nil && wrapped.Quote != nil && wrapped.Quote.Type != "" {
+		return wrapped.Quote, nil
+	}
+
 	var quote lifiapi.Quote
 	if err := json.Unmarshal(data, &quote); err != nil {
 		return nil, err

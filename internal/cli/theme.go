@@ -6,12 +6,11 @@ import (
 )
 
 const lifiBanner = `
- _      _  __ _
-| |    (_)/ _(_)
-| |     _| |_ _   li.fi earn + composer
-| |    | |  _| |  route yield from the terminal
-| |____| | | | |
-|______|_|_| |_|
+ __    ___ _____ ___    ____ _     ___ 
+|  |  |_ _|  ___|_ _|  / ___| |   |_ _|
+|  |   | || |_   | |  | |   | |    | | 
+|  |___| ||  _|  | |  | |___| |___ | | 
+|______|___|_|   |___|  \____|_____|___|
 `
 
 func colorize(value, code string, noColor bool) string {
@@ -24,22 +23,19 @@ func colorize(value, code string, noColor bool) string {
 func brandBanner(noColor bool) string {
 	banner := strings.TrimLeft(lifiBanner, "\n")
 	if noColor {
-		return banner
+		return banner + "li.fi cli | earn + composer for builders\n"
 	}
 	lines := strings.Split(strings.TrimRight(banner, "\n"), "\n")
 	for i, line := range lines {
 		switch {
 		case i == 0 || i == len(lines)-1:
-			lines[i] = colorize(line, "36;1", false)
-		case strings.Contains(line, "li.fi earn + composer"):
-			lines[i] = colorize(line, "97;1", false)
-		case strings.Contains(line, "route yield from the terminal"):
-			lines[i] = colorize(line, "90", false)
+			lines[i] = colorize(line, "38;5;213;1", false)
 		default:
-			lines[i] = colorize(line, "34;1", false)
+			lines[i] = colorize(line, "38;5;205;1", false)
 		}
 	}
-	return strings.Join(lines, "\n") + "\n"
+	tagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| earn + composer for builders", "38;5;250", false)
+	return strings.Join(lines, "\n") + "\n" + tagline + "\n"
 }
 
 func sectionTitle(title string, noColor bool) string {
@@ -47,7 +43,7 @@ func sectionTitle(title string, noColor bool) string {
 	if noColor {
 		return label
 	}
-	return colorize(label, "36;1", false)
+	return colorize(label, "38;5;205;1", false)
 }
 
 func sectionRule(noColor bool) string {
@@ -64,9 +60,26 @@ func printSectionHeader(title string, noColor bool) {
 }
 
 func accentValue(value string, noColor bool) string {
-	return colorize(value, "97;1", noColor)
+	return colorize(value, "38;5;219;1", noColor)
 }
 
 func subtleValue(value string, noColor bool) string {
 	return colorize(value, "90", noColor)
+}
+
+func statusLabel(status string, noColor bool) string {
+	label := "[" + strings.ToLower(strings.TrimSpace(status)) + "]"
+	if noColor {
+		return label
+	}
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "ok", "yes", "done", "completed":
+		return colorize(label, "32;1", false)
+	case "warn", "pending":
+		return colorize(label, "33;1", false)
+	case "fail", "error", "no":
+		return colorize(label, "31;1", false)
+	default:
+		return colorize(label, "38;5;219;1", false)
+	}
 }

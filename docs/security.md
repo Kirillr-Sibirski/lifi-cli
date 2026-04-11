@@ -18,5 +18,9 @@ Current secret model:
 - `.env`
 - exported shell environment variables
 - config profiles that reference a private-key env var name
+- optional `LIFI_API_KEY` stored locally for server-side or CLI use only
+
+Do not expose `LIFI_API_KEY` in frontend code. LI.FI’s API docs explicitly warn
+against client-side exposure of `x-lifi-api-key`.
 
 OS keychain storage is not part of the current release.

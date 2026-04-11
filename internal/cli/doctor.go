@@ -150,7 +150,7 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 		}
 		printSectionHeader(category, cfg.Global.NoColor)
 		for _, check := range filtered {
-			fmt.Printf("  [%s] %s", check.Status, check.Name)
+			fmt.Printf("  %s %s", statusLabel(check.Status, cfg.Global.NoColor), check.Name)
 			if check.Detail != "" {
 				fmt.Printf(": %s", check.Detail)
 			}

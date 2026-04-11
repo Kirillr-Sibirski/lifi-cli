@@ -38,7 +38,7 @@ Release details are documented in [docs/release.md](docs/release.md).
 ## Quick start
 
 1. Copy `.env.example` to `.env`.
-2. Add `LIFI_API_KEY`.
+2. Optionally add `LIFI_API_KEY` for higher rate limits and hackathon use.
 3. Add RPC URLs for the chains you plan to use.
 4. Optionally add `LIFI_WALLET_PRIVATE_KEY` for write commands.
 5. Run `lifi doctor --write-checks`.
@@ -119,6 +119,9 @@ LIFI_RPC_BASE=https://mainnet.base.org
 LIFI_RPC_OPT=https://mainnet.optimism.io
 ```
 
+`LIFI_API_KEY` is optional for basic LI.FI API usage, but recommended for
+higher limits and for the hackathon flow described in the builder guide.
+
 Profile-aware config example:
 
 ```yaml
@@ -174,6 +177,10 @@ lifi quote \
   --unsigned \
   --json
 ```
+
+You can reuse that JSON file with `lifi allowance --quote-file ...` because the
+CLI understands both raw quote payloads and wrapped `quote --unsigned --json`
+output.
 
 ### Run a dry-run deposit
 
