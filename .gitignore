@@ -5,3 +5,4 @@ dist/
 node_modules/
 .next/
 .DS_Store
+frontend/content/*.md
