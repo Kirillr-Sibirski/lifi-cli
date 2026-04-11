@@ -37,9 +37,9 @@ type runtime struct {
 
 func newRuntime(cfg *config.Config) *runtime {
 	return &runtime{
-		cfg:          cfg,
-		earnClient:   earn.New(),
-		lifiClient:   lifiapi.New(cfg.APIKey),
+		cfg:           cfg,
+		earnClient:    earn.New(),
+		lifiClient:    lifiapi.New(cfg.APIKey),
 		tokensByChain: map[int][]lifiapi.Token{},
 	}
 }
@@ -254,6 +254,15 @@ func splitCSV(value string) []string {
 	return result
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 func parseAmountToBaseUnits(value string, decimals int) (*big.Int, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -377,6 +386,14 @@ func parseMaybeInt(value string) int {
 		return 0
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+func parseFloat(value string) float64 {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
 	if err != nil {
 		return 0
 	}

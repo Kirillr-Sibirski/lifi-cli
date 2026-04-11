@@ -21,19 +21,19 @@ type Client struct {
 }
 
 type Chain struct {
-	Key              string     `json:"key"`
-	ChainType        string     `json:"chainType"`
-	Name             string     `json:"name"`
-	Coin             string     `json:"coin"`
-	ID               int        `json:"id"`
-	Mainnet          bool       `json:"mainnet"`
-	LogoURI          string     `json:"logoURI"`
-	RelayerSupported bool       `json:"relayerSupported"`
-	Metamask         Metamask   `json:"metamask"`
-	NativeToken      Token      `json:"nativeToken"`
-	DiamondAddress   string     `json:"diamondAddress"`
-	Permit2          string     `json:"permit2"`
-	Permit2Proxy     string     `json:"permit2Proxy"`
+	Key              string   `json:"key"`
+	ChainType        string   `json:"chainType"`
+	Name             string   `json:"name"`
+	Coin             string   `json:"coin"`
+	ID               int      `json:"id"`
+	Mainnet          bool     `json:"mainnet"`
+	LogoURI          string   `json:"logoURI"`
+	RelayerSupported bool     `json:"relayerSupported"`
+	Metamask         Metamask `json:"metamask"`
+	NativeToken      Token    `json:"nativeToken"`
+	DiamondAddress   string   `json:"diamondAddress"`
+	Permit2          string   `json:"permit2"`
+	Permit2Proxy     string   `json:"permit2Proxy"`
 }
 
 type Metamask struct {
@@ -44,17 +44,17 @@ type Metamask struct {
 }
 
 type Token struct {
-	ChainID                    int      `json:"chainId"`
-	Address                    string   `json:"address"`
-	Symbol                     string   `json:"symbol"`
-	Name                       string   `json:"name"`
-	Decimals                   int      `json:"decimals"`
-	PriceUSD                   string   `json:"priceUSD"`
-	CoinKey                    string   `json:"coinKey"`
-	LogoURI                    string   `json:"logoURI"`
-	Tags                       []string `json:"tags"`
-	VerificationStatus         string   `json:"verificationStatus"`
-	VerificationStatusBreakdown []any   `json:"verificationStatusBreakdown"`
+	ChainID                     int      `json:"chainId"`
+	Address                     string   `json:"address"`
+	Symbol                      string   `json:"symbol"`
+	Name                        string   `json:"name"`
+	Decimals                    int      `json:"decimals"`
+	PriceUSD                    string   `json:"priceUSD"`
+	CoinKey                     string   `json:"coinKey"`
+	LogoURI                     string   `json:"logoURI"`
+	Tags                        []string `json:"tags"`
+	VerificationStatus          string   `json:"verificationStatus"`
+	VerificationStatusBreakdown []any    `json:"verificationStatusBreakdown"`
 }
 
 type ToolsResponse struct {
@@ -63,15 +63,10 @@ type ToolsResponse struct {
 }
 
 type Tool struct {
-	Key             string          `json:"key"`
-	Name            string          `json:"name"`
-	LogoURI         string          `json:"logoURI"`
-	SupportedChains []SupportedPair `json:"supportedChains"`
-}
-
-type SupportedPair struct {
-	FromChainID int `json:"fromChainId"`
-	ToChainID   int `json:"toChainId"`
+	Key             string `json:"key"`
+	Name            string `json:"name"`
+	LogoURI         string `json:"logoURI"`
+	SupportedChains []any  `json:"supportedChains"`
 }
 
 type TokensResponse struct {
