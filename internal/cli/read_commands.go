@@ -188,7 +188,7 @@ func (protocolsCommand) Run(cfg *config.Config, args []string) error {
 		return writeJSON(payload)
 	}
 
-	fmt.Println("Earn protocols")
+	printSectionHeader("Earn Protocols", cfg.Global.NoColor)
 	earnRows := make([][]string, 0, len(filteredEarn))
 	for _, protocol := range filteredEarn {
 		earnRows = append(earnRows, []string{
@@ -200,8 +200,7 @@ func (protocolsCommand) Run(cfg *config.Config, args []string) error {
 	}
 	printTable([]string{"name", "deposit", "withdraw", "url"}, earnRows)
 	fmt.Println()
-
-	fmt.Println("Composer tools")
+	printSectionHeader("Composer Tools", cfg.Global.NoColor)
 	toolRows := [][]string{}
 	for _, tool := range payload["bridges"].([]map[string]any) {
 		toolRows = append(toolRows, []string{fmt.Sprint(tool["kind"]), fmt.Sprint(tool["key"]), fmt.Sprint(tool["name"])})
@@ -407,6 +406,7 @@ func (inspectCommand) Run(cfg *config.Config, args []string) error {
 	if vault.Analytics.APY.Total == 0 {
 		rows = append(rows, []string{"warning", "APY data may be incomplete"})
 	}
+	printSectionHeader("Vault Details", cfg.Global.NoColor)
 	printTable([]string{"field", "value"}, rows)
 	return nil
 }
@@ -524,6 +524,7 @@ func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 	for index, position := range filtered {
 		rows = append(rows, portfolioSummaryRow(index+1, position))
 	}
+	printSectionHeader("Portfolio", cfg.Global.NoColor)
 	printTable([]string{"#", "chain", "protocol", "asset", "balance", "value"}, rows)
 	if cfg.Global.Verbose {
 		for index, position := range filtered {
@@ -615,6 +616,7 @@ func (statusCommand) Run(cfg *config.Config, args []string) error {
 				return writeJSON(payload)
 			}
 		} else {
+			printSectionHeader("Status", cfg.Global.NoColor)
 			printTable([]string{"field", "value"}, statusSummaryRows(payload))
 			if cfg.Global.Verbose {
 				fmt.Println()

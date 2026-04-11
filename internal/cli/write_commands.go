@@ -364,7 +364,7 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	}
 
 	if !cfg.Global.JSON {
-		printDepositSummary(preflightResult.Preflight)
+		printDepositSummary(preflightResult.Preflight, cfg.Global.NoColor)
 	}
 	if dryRun {
 		if cfg.Global.JSON {
@@ -444,10 +444,11 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	return nil
 }
 
-func printDepositSummary(preflight *flow.Preflight) {
+func printDepositSummary(preflight *flow.Preflight, noColor bool) {
 	if preflight == nil {
 		return
 	}
+	printSectionHeader("Execution Plan", noColor)
 	printTable([]string{"field", "value"}, [][]string{
 		{"wallet", preflight.WalletAddress},
 		{"source chain", preflight.SourceChain},

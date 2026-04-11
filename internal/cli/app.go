@@ -39,20 +39,20 @@ func Run(args []string) int {
 	}
 
 	if len(remaining) == 0 {
-		printRootUsage(commands)
+		printRootUsage(commands, cfg.Global.NoColor)
 		return 0
 	}
 
 	name := remaining[0]
 	if name == "help" {
-		printRootUsage(commands)
+		printRootUsage(commands, cfg.Global.NoColor)
 		return 0
 	}
 
 	cmd, ok := commands[name]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", name)
-		printRootUsage(commands)
+		printRootUsage(commands, cfg.Global.NoColor)
 		return 2
 	}
 
@@ -138,21 +138,19 @@ func builtInCommands() map[string]Command {
 	return result
 }
 
-func printRootUsage(commands map[string]Command) {
+func printRootUsage(commands map[string]Command, noColor bool) {
 	names := make([]string, 0, len(commands))
 	for name := range commands {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
-	fmt.Println("lifi")
+	fmt.Print(brandBanner(noColor))
 	fmt.Println()
-	fmt.Println("CLI for LI.FI Earn and Composer.")
-	fmt.Println()
-	fmt.Println("Usage:")
+	printSectionHeader("Usage", noColor)
 	fmt.Println("  lifi [global flags] <command> [command flags] [arguments]")
 	fmt.Println()
-	fmt.Println("Global flags:")
+	printSectionHeader("Global Flags", noColor)
 	fmt.Println("  --config <path>   Path to the config file")
 	fmt.Println("  --profile <name>  Config profile name")
 	fmt.Println("  --json            Print machine-readable JSON output")
@@ -160,7 +158,7 @@ func printRootUsage(commands map[string]Command) {
 	fmt.Println("  --quiet           Reduce non-essential output")
 	fmt.Println("  --no-color        Disable ANSI color output")
 	fmt.Println()
-	fmt.Println("Commands:")
+	printSectionHeader("Commands", noColor)
 
 	longest := 0
 	for _, name := range names {
@@ -175,7 +173,7 @@ func printRootUsage(commands map[string]Command) {
 	}
 
 	fmt.Println()
-	fmt.Println("Run `lifi <command> --help` for command details.")
+	fmt.Println(subtleValue("Run `lifi <command> --help` for command details.", noColor))
 }
 
 func newFlagSet(name string) *FlagSet {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
@@ -109,7 +108,7 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 		if len(filtered) == 0 {
 			continue
 		}
-		fmt.Printf("%s\n", strings.ToUpper(category))
+		printSectionHeader(category, cfg.Global.NoColor)
 		for _, check := range filtered {
 			fmt.Printf("  [%s] %s", check.Status, check.Name)
 			if check.Detail != "" {
