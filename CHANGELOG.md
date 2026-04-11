@@ -4,6 +4,17 @@ All notable changes to `lifi` are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-11
+
+- Refreshed the terminal presentation with a larger magenta `li.fi cli`
+  banner and colored doctor status labels.
+- Fixed `allowance --quote-file` so it accepts wrapped JSON from
+  `quote --unsigned --json`.
+- Updated shell completion specs to include the current `quote`, `approve`, and
+  `deposit` flags.
+- Aligned docs with the current LI.FI API guidance around optional API keys and
+  server-side usage.
+
 ## [0.1.1] - 2026-04-11
 
 - Added stronger `doctor` checks for wallet/address consistency, live RPC chain
