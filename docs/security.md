@@ -11,6 +11,7 @@ Recommendations:
 - Use `deposit --dry-run` before a real broadcast.
 - Keep `--approval-amount exact` unless you explicitly want an infinite approval.
 - Use `lifi doctor --write-checks` before first use on a chain.
+- Check that `doctor` reports a matching configured and derived wallet address.
 
 Current secret model:
 

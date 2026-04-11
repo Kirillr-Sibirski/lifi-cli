@@ -5,23 +5,38 @@ the Homebrew tap.
 
 ## Release flow
 
-1. Merge to `main`.
-2. Tag a semantic version like `v0.2.0`.
-3. Push the tag.
-4. GitHub Actions runs GoReleaser.
-5. GoReleaser builds darwin/linux archives and checksums.
-6. Update [`Formula/lifi.rb`](../Formula/lifi.rb) to point at the new tagged
-   source tarball and checksum.
-7. Push the formula update to `main`.
+1. Run the verification checklist in [docs/operations.md](operations.md).
+2. Update [CHANGELOG.md](../CHANGELOG.md).
+3. Commit and push `main`.
+4. Tag a semantic version like `v0.1.1`.
+5. Push the tag.
+6. GitHub Actions runs GoReleaser and publishes archives plus `checksums.txt`.
+7. Update the stable Homebrew formula:
 
-## Required secrets
+   ```bash
+   ./scripts/update_formula.sh v0.1.1
+   ```
 
-- `GORELEASER_CURRENT_TAG`
+8. Commit the formula update and push `main`.
+9. Verify the release page and install flow.
+
+## GitHub release automation
+
+The release workflow uses only the default `GITHUB_TOKEN` provided by GitHub
+Actions. No extra release secret is required for the current setup.
+
+Expected artifacts:
+
+- darwin amd64 tarball
+- darwin arm64 tarball
+- linux amd64 tarball
+- linux arm64 tarball
+- `checksums.txt`
 
 ## Local snapshot
 
 ```bash
-goreleaser release --snapshot --clean
+make snapshot
 ```
 
 ## Install path
@@ -36,3 +51,13 @@ For a `main` build:
 ```bash
 brew install --HEAD Kirillr-Sibirski/lifi-cli/lifi
 ```
+
+## Release verification
+
+After the tag is pushed, confirm:
+
+1. the workflow run is green
+2. the GitHub release page exists for the tag
+3. release artifacts are downloadable
+4. `brew install lifi` resolves to the new stable version after the formula
+   update lands

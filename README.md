@@ -4,6 +4,9 @@ Home of the `lifi` CLI for LI.FI Earn and Composer.
 
 `lifi` is a macOS/Linux command-line tool for discovering vaults, generating Composer quotes, running deposits, and verifying portfolio positions without building a frontend first.
 
+The repository ships the CLI, Homebrew packaging, release automation, and the
+operational docs needed to keep it healthy after release.
+
 ## Install
 
 ### Build from source
@@ -315,6 +318,9 @@ LIFI_SMOKE=1 go test ./internal/cli -run TestLiveSmokeReadPath
 Release and packaging guidance:
 
 - [docs/release.md](docs/release.md)
+- [docs/operations.md](docs/operations.md)
 - [docs/security.md](docs/security.md)
 - [docs/automation.md](docs/automation.md)
 - [docs/supported-chains.md](docs/supported-chains.md)
+- [CHANGELOG.md](CHANGELOG.md)
+- [LICENSE](LICENSE)
