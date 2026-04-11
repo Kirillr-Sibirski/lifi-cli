@@ -190,25 +190,49 @@ func (protocolsCommand) Run(cfg *config.Config, args []string) error {
 
 	printSectionHeader("Earn Protocols", cfg.Global.NoColor)
 	earnRows := make([][]string, 0, len(filteredEarn))
-	for _, protocol := range filteredEarn {
-		earnRows = append(earnRows, []string{
-			fmt.Sprint(protocol["name"]),
-			boolText(protocol["supportsDeposit"].(bool)),
-			boolText(protocol["supportsWithdraw"].(bool)),
-			truncateStr(fmt.Sprint(protocol["url"]), 48),
-		})
+	if supports != "" {
+		// With a capability filter, show deposit/withdraw columns so the filter makes sense.
+		for _, protocol := range filteredEarn {
+			earnRows = append(earnRows, []string{
+				fmt.Sprint(protocol["name"]),
+				boolText(protocol["supportsDeposit"].(bool)),
+				boolText(protocol["supportsWithdraw"].(bool)),
+			})
+		}
+		printTable([]string{"name", "deposit", "withdraw"}, earnRows)
+	} else {
+		for _, protocol := range filteredEarn {
+			row := []string{fmt.Sprint(protocol["name"])}
+			if cfg.Global.Verbose {
+				row = append(row, truncateStr(fmt.Sprint(protocol["url"]), 60))
+			}
+			earnRows = append(earnRows, row)
+		}
+		if cfg.Global.Verbose {
+			printTable([]string{"name", "url"}, earnRows)
+		} else {
+			printTable([]string{"name"}, earnRows)
+		}
 	}
-	printTable([]string{"name", "deposit", "withdraw", "url"}, earnRows)
 	fmt.Println()
-	printSectionHeader("Composer Tools", cfg.Global.NoColor)
-	toolRows := [][]string{}
-	for _, tool := range payload["bridges"].([]map[string]any) {
-		toolRows = append(toolRows, []string{fmt.Sprint(tool["kind"]), fmt.Sprint(tool["key"]), fmt.Sprint(tool["name"])})
+
+	bridges := payload["bridges"].([]map[string]any)
+	exchanges := payload["exchanges"].([]map[string]any)
+
+	printSectionHeader("Bridges", cfg.Global.NoColor)
+	bridgeRows := make([][]string, 0, len(bridges))
+	for _, tool := range bridges {
+		bridgeRows = append(bridgeRows, []string{fmt.Sprint(tool["key"]), fmt.Sprint(tool["name"])})
 	}
-	for _, tool := range payload["exchanges"].([]map[string]any) {
-		toolRows = append(toolRows, []string{fmt.Sprint(tool["kind"]), fmt.Sprint(tool["key"]), fmt.Sprint(tool["name"])})
+	printTable([]string{"key", "name"}, bridgeRows)
+	fmt.Println()
+
+	printSectionHeader("Exchanges", cfg.Global.NoColor)
+	exchangeRows := make([][]string, 0, len(exchanges))
+	for _, tool := range exchanges {
+		exchangeRows = append(exchangeRows, []string{fmt.Sprint(tool["key"]), fmt.Sprint(tool["name"])})
 	}
-	printTable([]string{"kind", "key", "name"}, toolRows)
+	printTable([]string{"key", "name"}, exchangeRows)
 	return nil
 }
 
@@ -490,7 +514,7 @@ func (portfolioCommand) Usage() string {
 
 func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("portfolio requires an address")
+		return fmt.Errorf("portfolio requires an address\n\nUsage: %s\nExample: lifi portfolio 0xYourWallet --chain base", (portfolioCommand{}).Usage())
 	}
 
 	fs := newFlagSet("portfolio")
@@ -505,6 +529,13 @@ func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 	rt := newRuntime(cfg)
 	ctx, cancel := rt.context()
 	defer cancel()
+
+	// Load chains so we can resolve chain IDs to names in the table.
+	chains, _ := rt.loadChains(ctx)
+	chainNames := make(map[string]string, len(chains))
+	for _, c := range chains {
+		chainNames[strconv.Itoa(c.ID)] = c.Name
+	}
 
 	response, err := rt.earnClient.GetPortfolio(ctx, args[0])
 	if err != nil {
@@ -528,7 +559,7 @@ func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 
 	rows := make([][]string, 0, len(filtered))
 	for index, position := range filtered {
-		rows = append(rows, portfolioSummaryRow(index+1, position))
+		rows = append(rows, portfolioSummaryRow(index+1, position, chainNames))
 	}
 	printSectionHeader("Portfolio", cfg.Global.NoColor)
 	printTable([]string{"#", "chain", "protocol", "asset", "balance", "value"}, rows)
@@ -812,27 +843,50 @@ func isTerminalStatus(payload map[string]any) bool {
 	}
 }
 
-func portfolioSummaryRow(index int, position map[string]any) []string {
+func portfolioSummaryRow(index int, position map[string]any, chainNames map[string]string) []string {
 	assetSymbol := "-"
 	if asset, ok := position["asset"].(map[string]any); ok {
 		if symbol := strings.TrimSpace(fmt.Sprint(asset["symbol"])); symbol != "" {
 			assetSymbol = symbol
 		}
 	}
+
+	valueStr := nilSafe(position["valueUsd"])
+	if valueStr != "" && valueStr != "-" {
+		if v, err := strconv.ParseFloat(valueStr, 64); err == nil {
+			valueStr = fmt.Sprintf("$%.2f", v)
+		}
+	}
+
 	return []string{
 		strconv.Itoa(index),
-		emptyFallback(chainLabelForPosition(position)),
-		emptyFallback(strings.TrimSpace(fmt.Sprint(position["protocolName"]))),
+		chainLabelForPosition(position, chainNames),
+		nilSafe(position["protocolName"]),
 		assetSymbol,
-		emptyFallback(strings.TrimSpace(fmt.Sprint(position["balanceNative"]))),
-		emptyFallback(strings.TrimSpace(fmt.Sprint(position["valueUsd"]))),
+		nilSafe(position["balanceNative"]),
+		valueStr,
 	}
 }
 
-func chainLabelForPosition(position map[string]any) string {
+// nilSafe converts any value to string, returning "-" for nil or "<nil>".
+func nilSafe(v any) string {
+	if v == nil {
+		return "-"
+	}
+	s := strings.TrimSpace(fmt.Sprint(v))
+	if s == "" || s == "<nil>" {
+		return "-"
+	}
+	return s
+}
+
+func chainLabelForPosition(position map[string]any, chainNames map[string]string) string {
 	chainID := strings.TrimSpace(fmt.Sprint(position["chainId"]))
 	if chainID == "" || chainID == "<nil>" {
-		return ""
+		return "-"
+	}
+	if name, ok := chainNames[chainID]; ok {
+		return name
 	}
 	return chainID
 }

@@ -4,6 +4,17 @@ All notable changes to `lifi` are documented here.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-11
+
+- Replaced the ASCII logo with a DOS Rebel block-font banner (`li.fi cli`).
+- Cleaned up `lifi protocols`: earn protocols now show name only by default
+  (URL visible with `--verbose`); deposit/withdraw columns only appear with
+  `--supports`); composer tools are split into separate Bridges and Exchanges
+  sections.
+- Fixed portfolio table: chain column now shows the chain name instead of the
+  numeric chain ID; `value` column rendered as `$12.34`; nil/empty values
+  shown as `-` instead of `<nil>`.
+
 ## [0.1.4] - 2026-04-11
 
 - Fixed pixel art bridge banner (string replacement was corrupting the 8-block
