@@ -5,8 +5,9 @@ This folder contains the deployable documentation frontend for `lifi-cli`.
 It is a small Next.js app that:
 
 - syncs the markdown files from the repository root
-- renders them in a dark GitBook-style layout
-- provides a landing page for the CLI and its Earn + Composer flows
+- renders them in a minimal docs-first layout
+- sends `/` and `/docs` straight to the Getting Started page
+- keeps generated markdown out of git
 
 ## Local development
 
@@ -21,6 +22,9 @@ The content is synced automatically from:
 - `../README.md`
 - `../docs/*.md`
 - `../CHANGELOG.md`
+
+The generated copies land in `frontend/content/` during `dev` and `build`.
+That folder is treated as build output rather than authored source.
 
 ## Production build
 

@@ -2,9 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DocsSidebar } from "@/components/docs-sidebar";
-import { MarkdownRenderer } from "@/components/markdown-renderer";
-import { getDocBySlugSync, getDocPage, getDocs, getNeighborDocs } from "@/lib/content";
+import { DocsSidebar } from "@/components/docs/sidebar";
+import { MarkdownRenderer } from "@/components/docs/markdown-renderer";
+import {
+  getDocBySlugSync,
+  getDocPage,
+  getDocs,
+  getNeighborDocs,
+} from "@/lib/docs-content";
 
 type DocPageProps = {
   params: Promise<{ slug: string }>;

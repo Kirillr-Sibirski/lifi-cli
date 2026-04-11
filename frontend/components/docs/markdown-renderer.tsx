@@ -6,7 +6,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { rewriteMarkdownHref, slugify } from "@/lib/markdown";
+import { rewriteMarkdownHref, slugify } from "@/lib/docs-markdown";
 
 type MarkdownRendererProps = {
   content: string;

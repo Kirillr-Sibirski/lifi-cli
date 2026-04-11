@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getDocSections } from "@/lib/content";
+import { getDocSections } from "@/lib/docs-content";
 
 type DocsSidebarProps = {
   activeSlug?: string;

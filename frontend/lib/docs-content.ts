@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import docsConfig from "@/content.config.json";
-import { slugify } from "@/lib/markdown";
+import { slugify } from "@/lib/docs-markdown";
 
 export type DocConfig = {
   slug: string;

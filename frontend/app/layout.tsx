@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "lifi-cli docs",
-  description: "Dark, lightweight documentation for the lifi CLI and its Earn + Composer flows.",
+  description: "Minimal documentation for the lifi CLI and its Earn + Composer flows.",
 };
 
 export default function RootLayout({
