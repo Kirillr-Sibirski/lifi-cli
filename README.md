@@ -1,78 +1,121 @@
 # lifi-cli
 
-**`lifi`** is a macOS/Linux command-line tool for the [LI.FI](https://li.fi) protocol — discover yield vaults, route cross-chain deposits, check allowances, and verify positions without building a frontend.
+**`lifi`** is a command-line tool for [LI.FI](https://li.fi) — discover yield vaults, generate cross-chain deposit quotes, and execute on-chain transactions from your terminal.
 
 ```
-lifi vaults --chain base --asset USDC --transactional-only --sort apy --limit 10
-lifi deposit --vault 0xVault --from-chain base --from-token USDC --amount 100 --wait --verify-position
+lifi vaults --chain base --asset USDC --sort apy --limit 5
+lifi deposit --vault 0xVault --from-chain base --from-token USDC --amount 100 --dry-run
 ```
-
----
-
-## Contents
-
-- [Install](#install)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [Earn — vault discovery & deposits](#earn)
-- [Composer — quoting & routing](#composer)
-- [Command reference](#command-reference)
-- [Safety model](#safety-model)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development)
 
 ---
 
 ## Install
-
-### Homebrew (recommended)
 
 ```bash
 brew tap Kirillr-Sibirski/lifi-cli https://github.com/Kirillr-Sibirski/lifi-cli
 brew install lifi
 ```
 
-To track the latest `main` build instead of the tagged release:
-
-```bash
-brew install --HEAD Kirillr-Sibirski/lifi-cli/lifi
-```
-
-### Build from source
+Or build from source:
 
 ```bash
 git clone https://github.com/Kirillr-Sibirski/lifi-cli.git
 cd lifi-cli
 go build -o bin/lifi ./cmd/lifi
-./bin/lifi version
 ```
 
 ---
 
-## Quick start
+## Setup
 
 ```bash
-# 1. Copy the environment template
 cp .env.example .env
-# Fill in LIFI_WALLET_PRIVATE_KEY and at least one LIFI_RPC_* entry
+```
 
-# 2. Verify your environment
+Open `.env` and fill in what you need:
+
+```bash
+# Required for deposit and approve
+LIFI_WALLET_PRIVATE_KEY=0xabc...
+
+# Required for on-chain calls — add one per chain you use
+# Key must match the chain's key from `lifi chains` (e.g. base, opt, arb, eth)
+LIFI_RPC_BASE=https://mainnet.base.org
+LIFI_RPC_OPT=https://mainnet.optimism.io
+
+# Optional — defaults
+LIFI_DEFAULT_FROM_CHAIN=base
+LIFI_DEFAULT_SLIPPAGE_BPS=50
+```
+
+Verify everything is wired up:
+
+```bash
 lifi doctor --write-checks --chain base
+```
 
-# 3. Discover vaults
-lifi vaults --chain base --asset USDC --transactional-only --sort apy --limit 10
+---
 
-# 4. Inspect a vault
-lifi inspect 0xVaultAddress
+## Earn
 
-# 5. Get a quote (no broadcast)
-lifi quote \
-  --vault 0xVaultAddress \
-  --from-chain base \
-  --from-token USDC \
-  --amount 100
+### Find vaults
 
-# 6. Dry-run the full deposit flow
+```bash
+lifi vaults --chain base --asset USDC --transactional-only --sort apy --limit 5
+```
+
+```
+ # │ vault    │ protocol    │ chain       │ asset │  apy   │ apy30d │     tvl   │ tx  │ address
+───┼──────────┼─────────────┼─────────────┼───────┼────────┼────────┼───────────┼─────┼─────────────────
+ 1 │ USDC     │ yo-protocol │ Base (8453) │ USDC  │ 16.46% │ 14.13% │ $27699993 │ yes │ 0x000000…8a65
+ 2 │ RE7USDC  │ morpho-v1   │ Base (8453) │ USDC  │  5.46% │  3.85% │  $2050694 │ yes │ 0x12afde…406e
+ 3 │ CSUSDC   │ morpho-v1   │ Base (8453) │ USDC  │  5.28% │  7.57% │  $4460216 │ yes │ 0x1d3b1c…4657
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--chain` | `$LIFI_DEFAULT_FROM_CHAIN` | Chain name, key, or numeric ID |
+| `--asset` | | Token symbol or address |
+| `--protocol` | | Protocol name (e.g. `morpho-v1`, `yo-protocol`) |
+| `--sort` | `apy` | `apy`, `apy30d`, `tvl`, or `name` |
+| `--order` | `desc` | `asc` or `desc` |
+| `--min-apy` | | Minimum APY% filter |
+| `--min-tvl-usd` | | Minimum TVL filter in USD |
+| `--transactional-only` | | Only show vaults you can deposit into |
+| `--limit` | `25` | Max results |
+
+### Inspect a vault
+
+```bash
+lifi inspect 0x1d3b1cd0a0f242d598834b3f2d126dc6bd774657
+```
+
+Prints full APY breakdown (base / reward / 30-day), TVL, protocol, and deposit capability.
+
+### Recommendations
+
+```bash
+lifi recommend --asset USDC --from-chain base --strategy highest-apy
+lifi recommend --asset USDC --from-chain base --strategy safest --min-tvl-usd 5000000
+```
+
+Strategies: `highest-apy`, `safest` (weighted by TVL), `balanced` (default).
+
+### Portfolio
+
+```bash
+lifi portfolio 0xYourWallet
+lifi portfolio 0xYourWallet --chain base --protocol morpho-v1
+```
+
+Shows current Earn positions. No wallet key required — pass any address.
+
+### Deposit
+
+```bash
+# 1. See the execution plan without broadcasting
 lifi deposit \
   --vault 0xVaultAddress \
   --from-chain base \
@@ -80,7 +123,7 @@ lifi deposit \
   --amount 100 \
   --dry-run
 
-# 7. Broadcast for real
+# 2. Broadcast, wait for confirmation, verify position appeared
 lifi deposit \
   --vault 0xVaultAddress \
   --from-chain base \
@@ -90,44 +133,154 @@ lifi deposit \
   --verify-position
 ```
 
+**Required:** `LIFI_WALLET_PRIVATE_KEY` and `LIFI_RPC_<CHAIN>`
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--vault` | required | Target vault address |
+| `--from-chain` | `$LIFI_DEFAULT_FROM_CHAIN` | Source chain |
+| `--from-token` | required | Token to deposit (e.g. `USDC`, `ETH`) |
+| `--amount` | required | Human-readable amount (e.g. `100`) |
+| `--to-chain` | vault's chain | For cross-chain deposits |
+| `--dry-run` | | Preflight only — never broadcasts |
+| `--wait` | | Wait for confirmation |
+| `--verify-position` | | Check portfolio after confirmation |
+| `--approve` | `auto` | `auto`, `always`, or `never` |
+| `--approval-amount` | `exact` | `exact` or `infinite` |
+| `--gas-policy` | `auto` | `auto`, `quote`, or `rpc` |
+| `--yes` | | Skip confirmation prompt |
+| `--skip-simulate` | | Bypass RPC simulation |
+
 ---
 
-## Configuration
+## Composer
 
-`lifi` resolves settings in this priority order:
+### Quote
 
-1. **Command flags** — highest priority, always win
-2. **Environment variables** — exported shell vars or values from `.env`
-3. **`~/.config/lifi/config.yaml`** — persistent file-based config with profile support
-4. **Built-in defaults**
-
-The `.env` file in your current working directory is loaded automatically on every run.
-
-### Environment variables
-
-| Variable | Required | Used by | Description |
-|---|---|---|---|
-| `LIFI_WALLET_PRIVATE_KEY` | Write commands | `deposit`, `approve` | Wallet private key for signing transactions. Address is derived automatically. |
-| `LIFI_WALLET_ADDRESS` | Quote/portfolio | `quote`, `allowance`, `portfolio` | Explicit wallet address. Auto-derived from private key if not set. |
-| `LIFI_RPC_<CHAIN>` | Write commands | `deposit`, `approve`, `allowance` | RPC endpoint for a chain. Suffix must match the chain key from `lifi chains`. |
-| `LIFI_API_KEY` | Optional | all | LI.FI API key for higher rate limits. Public tier works without one. |
-| `LIFI_DEFAULT_FROM_CHAIN` | Optional | all | Default chain when `--chain` is omitted. |
-| `LIFI_DEFAULT_SLIPPAGE_BPS` | Optional | `quote`, `deposit` | Default slippage in basis points (50 = 0.5%). |
-
-**RPC key format:** `LIFI_RPC_BASE`, `LIFI_RPC_OPT`, `LIFI_RPC_42161`  
-The suffix is normalized (lowercased, stripped of `_`/`-`) and matched against the chain name, key, or numeric ID. Run `lifi chains` to find the exact key for any chain.
-
-### Config file (`~/.config/lifi/config.yaml`)
-
-The config file supports named profiles, letting you maintain separate settings for different wallets or environments.
+Get a routing quote before any broadcast:
 
 ```bash
-lifi config init          # write a starter config file
-lifi config show          # show resolved settings for the active profile
-lifi --profile prod <cmd> # switch profile for one command
+lifi quote \
+  --vault 0xVaultAddress \
+  --from-chain base \
+  --from-token USDC \
+  --amount 100
 ```
 
-Example config file:
+Export an unsigned transaction for external signing:
+
+```bash
+lifi quote \
+  --vault 0xVaultAddress \
+  --from-chain base \
+  --from-token USDC \
+  --amount 100 \
+  --unsigned --json > quote.json
+```
+
+**Required:** `LIFI_WALLET_ADDRESS` or `LIFI_WALLET_PRIVATE_KEY` (address is derived from it).
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--vault` | required | Target vault address |
+| `--from-chain` | required | Source chain |
+| `--from-token` | required | Input token |
+| `--amount` | required | Input amount |
+| `--slippage-bps` | `50` | Slippage tolerance in basis points |
+| `--unsigned` | | Print the unsigned transaction payload |
+| `--allow-bridges` | | Comma-separated bridge allowlist |
+| `--deny-bridges` | | Comma-separated bridge denylist |
+
+### Check allowance
+
+```bash
+lifi allowance \
+  --chain base \
+  --token USDC \
+  --owner 0xYourWallet \
+  --spender 0xSpenderAddress \
+  --amount 100
+```
+
+Or from a saved quote file:
+
+```bash
+lifi allowance --quote-file quote.json --owner 0xYourWallet
+```
+
+**Required:** `LIFI_RPC_<CHAIN>`
+
+### Approve
+
+```bash
+lifi approve \
+  --chain base \
+  --token USDC \
+  --spender 0xSpenderAddress \
+  --amount 100
+```
+
+Use `--amount max` for an unlimited approval. `lifi deposit --approve auto` handles this automatically.
+
+**Required:** `LIFI_WALLET_PRIVATE_KEY` and `LIFI_RPC_<CHAIN>`
+
+### Track a transaction
+
+```bash
+lifi status --tx-hash 0xabc... --from-chain base
+lifi status --tx-hash 0xabc... --watch   # polls until done
+```
+
+---
+
+## Utility commands
+
+### doctor
+
+```bash
+lifi doctor                      # check API connectivity and config
+lifi doctor --write-checks       # also check wallet and RPC readiness
+lifi doctor --write-checks --chain base
+```
+
+### chains
+
+```bash
+lifi chains                      # list all supported chains
+lifi chains --search optimism    # filter by name
+lifi chains --evm-only           # only EVM chains
+```
+
+Chain keys (the `key` column) are the canonical identifiers used in `--chain` flags and `LIFI_RPC_*` env vars. Common keys: `eth`, `bas`, `opt`, `arb`, `bsc`, `pol`. Full names (`base`, `ethereum`, `optimism`) also work via fuzzy matching.
+
+### protocols
+
+```bash
+lifi protocols                        # all Earn protocols and Composer bridges
+lifi protocols --search morpho        # filter by name
+lifi protocols --supports deposit     # only protocols with deposit support
+```
+
+### tokens
+
+```bash
+lifi tokens --chain base --token USDC   # find the canonical USDC on Base
+lifi tokens --chain eth --token ETH     # native token info
+```
+
+### config
+
+```bash
+lifi config init          # write a starter config file to ~/.config/lifi/config.yaml
+lifi config show          # show resolved config for the active profile
+lifi --profile prod <cmd> # use a named profile for one command
+```
+
+Config file (`~/.config/lifi/config.yaml`) supports named profiles for multiple wallets or environments:
 
 ```yaml
 profile: default
@@ -138,403 +291,65 @@ profiles:
       from_chain: base
       slippage_bps: "50"
     wallet:
-      private_key_env: LIFI_WALLET_PRIVATE_KEY   # reads from env at runtime
+      private_key_env: LIFI_WALLET_PRIVATE_KEY
     rpcs:
       base: https://mainnet.base.org
       opt: https://mainnet.optimism.io
 
-  prod:
+  staging:
     defaults:
       from_chain: optimism
     wallet:
-      address: "0xYourProdWallet"
-      private_key_env: PROD_WALLET_KEY
+      private_key_env: STAGING_PRIVATE_KEY
     rpcs:
-      opt: https://my-private-optimism-rpc.example.com
+      opt: https://my-private-rpc.example.com
 ```
-
-Full configuration reference → [docs/configuration.md](docs/configuration.md)
 
 ---
 
-## Earn
+## Global flags
 
-The Earn commands interact with the LI.FI Earn API — discovering yield vaults and executing deposits.
-
-Full reference → [docs/earn.md](docs/earn.md)
-
-### `lifi vaults` — discover depositable vaults
-
-```
-lifi vaults [flags]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--chain <name\|id>` | `$LIFI_DEFAULT_FROM_CHAIN` | Filter by chain |
-| `--asset <symbol\|address>` | | Filter by underlying asset |
-| `--protocol <name>` | | Filter by protocol (e.g. `morpho-v1`) |
-| `--sort apy\|apy30d\|tvl\|name` | `apy` | Sort field |
-| `--order asc\|desc` | `desc` | Sort direction |
-| `--min-tvl-usd <amount>` | | Minimum TVL in USD |
-| `--min-apy <percent>` | | Minimum APY |
-| `--transactional-only` | `false` | Only show vaults that support deposits |
-| `--limit <n>` | `25` | Maximum results |
-| `--json` | | Machine-readable output |
-
-**Required secrets:** none (read-only)
+These work with every command:
 
 ```bash
-lifi vaults --chain base --asset USDC --transactional-only --sort apy --limit 10
-lifi vaults --chain ethereum --protocol morpho-v1 --min-tvl-usd 1000000 --json
+lifi --json <command>         # machine-readable JSON output
+lifi --verbose <command>      # extra detail
+lifi --no-color <command>     # disable colors (for pipes/CI)
+lifi --profile <name> <cmd>   # switch config profile
+lifi --config <path> <cmd>    # use a custom config file path
 ```
 
 ---
 
-### `lifi inspect` — full vault details
-
-```
-lifi inspect <vault-address|slug|name> [--json]
-```
-
-Prints APY breakdown (total / base / reward / 30-day), TVL, pack info, and deposit/redeem capability.
-
-**Required secrets:** none
-
----
-
-### `lifi recommend` — ranked vault suggestions
-
-```
-lifi recommend [flags]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--asset <symbol\|address>` | | Target asset |
-| `--from-chain <name\|id>` | | Source chain |
-| `--to-chain <name\|id>` | | Vault chain (defaults to from-chain) |
-| `--strategy highest-apy\|safest\|balanced` | `balanced` | Scoring strategy |
-| `--min-tvl-usd <amount>` | | TVL floor |
-| `--limit <n>` | `5` | Maximum results |
-
-**Required secrets:** none
-
-```bash
-lifi recommend --asset USDC --from-chain base --strategy highest-apy
-```
-
----
-
-### `lifi portfolio` — view on-chain positions
-
-```
-lifi portfolio <address> [flags]
-```
-
-| Flag | Description |
-|---|---|
-| `--chain <name\|id>` | Filter by chain |
-| `--protocol <name>` | Filter by protocol |
-| `--asset <symbol\|address>` | Filter by asset |
-
-**Required secrets:** none (the address is passed as an argument)
-
-```bash
-lifi portfolio 0xYourWallet --chain base
-lifi portfolio 0xYourWallet --protocol morpho-v1 --json
-```
-
----
-
-### `lifi deposit` — execute a full deposit
-
-```
-lifi deposit --vault <address> --from-chain <chain> --from-token <token> --amount <amount> [flags]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--vault <address>` | **required** | Target vault |
-| `--from-chain <name\|id>` | `$LIFI_DEFAULT_FROM_CHAIN` | Source chain |
-| `--from-token <symbol\|address>` | **required** | Token to deposit |
-| `--amount <human>` | **required** | Amount in human-readable units (e.g. `100`) |
-| `--to-chain <name\|id>` | vault's chain | Override destination chain |
-| `--from-address <address>` | derived from key | Override source wallet |
-| `--slippage-bps <n>` | `$LIFI_DEFAULT_SLIPPAGE_BPS` | Slippage tolerance |
-| `--approve auto\|always\|never` | `auto` | ERC-20 approval mode |
-| `--approval-amount exact\|infinite` | `exact` | Approval sizing |
-| `--gas-policy auto\|quote\|rpc` | `auto` | Gas pricing strategy |
-| `--wait` | `false` | Wait for on-chain confirmation |
-| `--verify-position` | `false` | Poll portfolio after confirmation |
-| `--wait-timeout <duration>` | `5m` | Max wait for confirmation |
-| `--portfolio-timeout <duration>` | `1m` | Max wait for position to appear |
-| `--dry-run` | `false` | Prepare and preflight only, no broadcast |
-| `--simulate` | `true` | RPC-simulate before broadcast |
-| `--skip-simulate` | `false` | Bypass simulation |
-| `--yes` | `false` | Skip confirmation prompt |
-
-**Required secrets:**
-- `LIFI_WALLET_PRIVATE_KEY` — signs the transaction
-- `LIFI_RPC_<CHAIN>` — RPC for the source chain
-
-```bash
-# Safe preflight (no broadcast)
-lifi deposit \
-  --vault 0xVault \
-  --from-chain base \
-  --from-token USDC \
-  --amount 100 \
-  --dry-run
-
-# Full broadcast with confirmation and position check
-lifi deposit \
-  --vault 0xVault \
-  --from-chain base \
-  --from-token USDC \
-  --amount 100 \
-  --wait \
-  --verify-position
-
-# Cross-chain deposit (USDC on Optimism → vault on Base)
-lifi deposit \
-  --vault 0xVault \
-  --from-chain opt \
-  --from-token USDC \
-  --to-chain base \
-  --amount 50 \
-  --wait
-```
-
----
-
-## Composer
-
-The Composer commands use the LI.FI Routing API to build, inspect, and execute cross-chain swap/bridge quotes.
-
-Full reference → [docs/composer.md](docs/composer.md)
-
-### `lifi quote` — generate a routing quote
-
-```
-lifi quote --vault <address> --from-chain <chain> --from-token <token> --amount <amount> [flags]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--vault <address>` | **required** | Target vault (used as the to-token) |
-| `--from-chain <name\|id>` | **required** | Source chain |
-| `--from-token <symbol\|address>` | **required** | Input token |
-| `--amount <human>` | **required** | Input amount (or use `--amount-wei`) |
-| `--amount-wei <raw>` | | Amount in base units (mutually exclusive with `--amount`) |
-| `--from-address <address>` | derived from key | Source wallet |
-| `--to-address <address>` | same as from | Destination wallet |
-| `--slippage-bps <n>` | `$LIFI_DEFAULT_SLIPPAGE_BPS` | Slippage in basis points |
-| `--allow-bridges <csv>` | | Allowlisted bridge keys |
-| `--deny-bridges <csv>` | | Denylisted bridge keys |
-| `--allow-exchanges <csv>` | | Allowlisted exchange keys |
-| `--deny-exchanges <csv>` | | Denylisted exchange keys |
-| `--unsigned` | `false` | Print the unsigned transaction payload for external signing |
-| `--raw` | `false` | Print raw transaction request details |
-
-**Required secrets:** `LIFI_WALLET_ADDRESS` (or `LIFI_WALLET_PRIVATE_KEY` to derive it)
-
-```bash
-# Standard quote
-lifi quote \
-  --vault 0xVault \
-  --from-chain base \
-  --from-token USDC \
-  --amount 100
-
-# Get an unsigned tx for external signing
-lifi quote \
-  --vault 0xVault \
-  --from-chain base \
-  --from-token USDC \
-  --amount 100 \
-  --unsigned \
-  --json > quote.json
-```
-
----
-
-### `lifi allowance` — check token approval
-
-```
-lifi allowance [--chain <chain>] [--token <token>] [--owner <address>] [--spender <address>] [--amount <human>] [--quote-file <path>]
-```
-
-Can be driven by a saved quote file (from `lifi quote --unsigned --json`):
-
-```bash
-lifi allowance --quote-file quote.json --owner 0xYourWallet
-```
-
-**Required secrets:** `LIFI_RPC_<CHAIN>` for on-chain lookup
-
----
-
-### `lifi approve` — send an ERC-20 approval
-
-```
-lifi approve --chain <chain> --token <token> --spender <address> --amount <human|max> [flags]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--chain <name\|id>` | **required** | Chain to approve on |
-| `--token <symbol\|address>` | **required** | Token to approve |
-| `--spender <address>` | **required** | Spender contract address |
-| `--amount <human\|max>` | **required** | Approval amount or `max` for unlimited |
-| `--gas-policy auto\|rpc` | `auto` | Gas pricing |
-| `--yes` | `false` | Skip confirmation prompt |
-
-**Required secrets:**
-- `LIFI_WALLET_PRIVATE_KEY`
-- `LIFI_RPC_<CHAIN>`
-
-```bash
-lifi approve \
-  --chain base \
-  --token USDC \
-  --spender 0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE \
-  --amount 100
-```
-
----
-
-### `lifi status` — track a transaction
-
-```
-lifi status --tx-hash <hash> [flags]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `--tx-hash <hash>` | **required** | Transaction hash |
-| `--from-chain <name\|id>` | | Source chain |
-| `--to-chain <name\|id>` | | Destination chain |
-| `--bridge <key>` | | Bridge or tool key |
-| `--watch` | `false` | Poll continuously until terminal status |
-| `--interval <duration>` | `5s` | Polling interval |
-
-**Required secrets:** none
-
----
-
-## Command reference
-
-### Read commands
-
-| Command | Description |
-|---|---|
-| `lifi doctor` | Check environment, RPC reachability, and wallet readiness |
-| `lifi chains` | List supported chains with their keys and IDs |
-| `lifi protocols` | List Earn protocols and Composer bridges/exchanges |
-| `lifi tokens` | Resolve or browse tokens by symbol or address |
-| `lifi vaults` | Discover and filter yield vaults |
-| `lifi inspect <vault>` | Full details for a single vault |
-| `lifi recommend` | Rank vaults by strategy score |
-| `lifi quote` | Build a Composer routing quote |
-| `lifi allowance` | Check ERC-20 token approval |
-| `lifi portfolio <address>` | View Earn positions for a wallet |
-| `lifi status` | Track a cross-chain transaction |
-
-### Write commands
-
-| Command | Description |
-|---|---|
-| `lifi approve` | Send an ERC-20 approval transaction |
-| `lifi deposit` | Execute a full Earn deposit (preflight + broadcast) |
-
-### Utility commands
-
-| Command | Description |
-|---|---|
-| `lifi config init` | Write a starter `config.yaml` |
-| `lifi config show` | Show resolved configuration for the active profile |
-| `lifi completion bash\|zsh\|fish` | Print shell completion script |
-| `lifi version` | Print version |
-
-### Global flags
-
-These flags can be placed before or after the command name:
-
-| Flag | Description |
-|---|---|
-| `--config <path>` | Path to config file |
-| `--profile <name>` | Config profile to use |
-| `--json` | Machine-readable JSON output |
-| `--verbose` | Enable verbose output |
-| `--quiet` | Suppress non-essential output |
-| `--no-color` | Disable ANSI color output |
-
----
-
-## Safety model
-
-`lifi` defaults to a conservative execution model:
+## Safety
 
 - `deposit` always runs a preflight check before broadcasting
+- `deposit --dry-run` never broadcasts — always safe to run
+- Simulation (`--simulate`) is on by default and catches most bad transactions before they hit the chain
+- Approvals default to `exact` amount — never approve more than needed
 - Write commands prompt for confirmation unless `--yes` is set
-- `deposit --simulate` is enabled by default (RPC simulation before broadcast)
-- `deposit --dry-run` never broadcasts — safe to run at any time
-- Simulations are skipped automatically when an approval is still needed
-- Approval mode is controlled by `--approve auto|always|never`
-- Approval sizing is controlled by `--approval-amount exact|infinite`
-- Gas behavior is controlled by `--gas-policy auto|quote|rpc`
-
-**Recommended defaults:**
-- Keep `--approval-amount exact` — never approve more than you need
-- Keep `--gas-policy auto` — lets the CLI pick the safest estimate
-- Use a dedicated low-balance wallet for testing
-- Verify RPC connectivity with `lifi doctor --write-checks`
-
-Security guidance → [docs/security.md](docs/security.md)
 
 ---
 
 ## Troubleshooting
 
-### `wallet private key is required`
-
+**`wallet private key is required`**  
 Set `LIFI_WALLET_PRIVATE_KEY` in `.env` or export it in your shell.
 
-### `chain is required` / `unknown chain`
+**`unknown chain "xyz"`**  
+Run `lifi chains --search xyz` to find the right key. Also try the numeric chain ID (e.g. `--chain 8453` for Base).
 
-Pass `--chain` explicitly or set `LIFI_DEFAULT_FROM_CHAIN`. Run `lifi chains` to see valid chain names and keys.
+**`--token is required` / `--vault is required`**  
+All flags use double-dash: `--token USDC`, not `-token USDC`.
 
-### `--token is required`
+**`no RPC URL configured for Base`**  
+Add `LIFI_RPC_BASE=https://mainnet.base.org` to `.env`. The key after `LIFI_RPC_` must match the chain name or key (run `lifi chains` to check).
 
-Flags must use double-dash syntax: `--token USDC`, not `-token USDC`.
+**`simulation failed`**  
+Run `lifi deposit ... --dry-run --json` to see the full preflight. If `approval_needed: true`, the simulation is intentionally skipped — grant approval first.
 
-### `no RPC URL configured for <chain>`
-
-Add `LIFI_RPC_<CHAIN_KEY>=<url>` to `.env`. The suffix must match the chain key shown by `lifi chains`. The chain's numeric ID also works (e.g. `LIFI_RPC_8453` for Base).
-
-### `approval is required but --approve=never was set`
-
-Use `--approve auto` or run `lifi approve` manually before the deposit.
-
-### `simulation failed`
-
-Check the token, chain, amount, and vault again:
-
-```bash
-lifi quote ...
-lifi deposit ... --dry-run --json
-```
-
-If `approval_needed` is `true`, simulation is skipped until the approval is granted — this is expected.
-
-### `position detected: no`
-
-The portfolio index may not have updated yet. Wait a moment and retry:
-
-```bash
-lifi portfolio 0xYourWallet --chain base
-```
+**`position detected: no`**  
+The portfolio index may take a moment to update. Retry with `lifi portfolio 0xYourWallet --chain base`.
 
 ---
 
@@ -542,23 +357,5 @@ lifi portfolio 0xYourWallet --chain base
 
 ```bash
 go test ./...
+LIFI_SMOKE=1 go test ./internal/cli -run TestLiveSmokeReadPath  # live network tests
 ```
-
-Optional live smoke tests (requires a real network):
-
-```bash
-LIFI_SMOKE=1 go test ./internal/cli -run TestLiveSmokeReadPath
-```
-
-### Docs
-
-- [docs/configuration.md](docs/configuration.md) — config file format, profiles, env vars
-- [docs/earn.md](docs/earn.md) — Earn commands in depth
-- [docs/composer.md](docs/composer.md) — Composer commands in depth
-- [docs/security.md](docs/security.md) — security recommendations
-- [docs/automation.md](docs/automation.md) — scripting and JSON output patterns
-- [docs/supported-chains.md](docs/supported-chains.md) — chain key reference
-- [docs/release.md](docs/release.md) — release and packaging process
-- [docs/operations.md](docs/operations.md) — operational runbook
-- [CHANGELOG.md](CHANGELOG.md)
-- [LICENSE](LICENSE)

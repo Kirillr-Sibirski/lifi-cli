@@ -133,7 +133,7 @@ func prepareQuote(cfg *config.Config, in quoteInputs) (*lifiapi.Quote, *lifiapi.
 	defer cancel()
 
 	if strings.TrimSpace(in.vaultArg) == "" {
-		return nil, nil, nil, "", fmt.Errorf("--vault is required")
+		return nil, nil, nil, "", fmt.Errorf("--vault is required\n\nExample: lifi quote --vault 0xVaultAddress --from-chain base --from-token USDC --amount 100\nRun `lifi vaults` to find a vault address.")
 	}
 	vault, err := rt.resolveVault(ctx, in.vaultArg)
 	if err != nil {

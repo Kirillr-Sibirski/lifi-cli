@@ -382,6 +382,23 @@ func boolText(value bool) string {
 	return "no"
 }
 
+// truncateAddr shortens a 0x… address to "0x<6hex>…<4hex>" for table display.
+func truncateAddr(addr string) string {
+	s := strings.TrimSpace(addr)
+	if len(s) < 14 || !strings.HasPrefix(strings.ToLower(s), "0x") {
+		return s
+	}
+	return s[:8] + "…" + s[len(s)-4:]
+}
+
+// truncateStr shortens a string to at most maxLen chars, appending "…" if cut.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "…"
+}
+
 // tableNoColor is set by app.Run once the config is loaded.
 var tableNoColor bool
 

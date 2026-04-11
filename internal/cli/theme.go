@@ -27,35 +27,33 @@ func colorize(value, code string, noColor bool) string {
 }
 
 func brandBanner(noColor bool) string {
-	banner := strings.TrimLeft(lifiBanner, "\n")
 	if noColor {
+		banner := strings.TrimLeft(lifiBanner, "\n")
 		return banner + "li.fi cli | earn + composer for builders\n"
 	}
-	lines := strings.Split(strings.TrimRight(banner, "\n"), "\n")
-	// First 5 lines are the bridge pixel art, rest is the text logo.
-	for i, line := range lines {
-		switch {
-		case i < 5:
-			// Bridge pixel art — bright magenta blocks, dim bridge line
-			colored := strings.ReplaceAll(line, "██████", colorize("██████", "38;5;213;1", false))
-			colored = strings.ReplaceAll(colored, "████████", colorize("████████", "38;5;205;1", false))
-			colored = strings.ReplaceAll(colored, "━", colorize("━", "38;5;241", false))
-			colored = strings.ReplaceAll(colored, "─", colorize("─", "38;5;241", false))
-			colored = strings.ReplaceAll(colored, "c r o s s ─ c h a i n", colorize("c r o s s ─ c h a i n", "38;5;241", false))
-			lines[i] = colored
-		case i == 5:
-			lines[i] = line // blank separator
-		default:
-			// Text logo — alternating pink shades
-			if i%2 == 0 {
-				lines[i] = colorize(line, "38;5;213;1", false)
-			} else {
-				lines[i] = colorize(line, "38;5;205;1", false)
-			}
-		}
-	}
+
+	p1 := func(s string) string { return colorize(s, "38;5;213;1", false) }
+	p2 := func(s string) string { return colorize(s, "38;5;205;1", false) }
+	dim := func(s string) string { return colorize(s, "90", false) }
+
+	bridge := strings.Join([]string{
+		"   " + p1("██████") + "                     " + p1("██████"),
+		"  " + p2("████████") + dim("━━━━━━━━━━━━━━━━━━━") + p2("████████"),
+		"  " + p2("████████") + "  " + dim("c r o s s ─ c h a i n"),
+		"  " + p2("████████") + dim("━━━━━━━━━━━━━━━━━━━") + p2("████████"),
+		"   " + p1("██████") + "                     " + p1("██████"),
+	}, "\n")
+
+	logo := strings.Join([]string{
+		p1(` __    ___ _____ ___    ____ _     ___`),
+		p2(`|  |  |_ _|  ___|_ _|  / ___| |   |_ _|`),
+		p1(`|  |   | || |_   | |  | |   | |    | |`),
+		p2(`|  |___| ||  _|  | |  | |___| |___ | |`),
+		p1(`|______|___|_|   |___|  \____|_____|___|`),
+	}, "\n")
+
 	tagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| earn + composer for builders", "38;5;250", false)
-	return strings.Join(lines, "\n") + "\n" + tagline + "\n"
+	return bridge + "\n\n" + logo + "\n" + tagline + "\n"
 }
 
 func sectionTitle(title string, noColor bool) string {

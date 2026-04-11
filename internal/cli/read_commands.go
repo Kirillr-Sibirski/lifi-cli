@@ -195,7 +195,7 @@ func (protocolsCommand) Run(cfg *config.Config, args []string) error {
 			fmt.Sprint(protocol["name"]),
 			boolText(protocol["supportsDeposit"].(bool)),
 			boolText(protocol["supportsWithdraw"].(bool)),
-			fmt.Sprint(protocol["url"]),
+			truncateStr(fmt.Sprint(protocol["url"]), 48),
 		})
 	}
 	printTable([]string{"name", "deposit", "withdraw", "url"}, earnRows)
@@ -219,15 +219,17 @@ func (tokensCommand) Name() string { return "tokens" }
 func (tokensCommand) Summary() string { return "Resolve tokens by symbol or address" }
 
 func (tokensCommand) Usage() string {
-	return "lifi tokens [--chain <chain>] [--token <symbol-or-address>] [--tags <tag[,tag]>] [--json]"
+	return "lifi tokens [--chain <chain>] [--token <symbol-or-address>] [--tags <tag[,tag]>] [--limit <n>] [--json]"
 }
 
 func (tokensCommand) Run(cfg *config.Config, args []string) error {
 	fs := newFlagSet("tokens")
 	var chainArg, tokenArg, tagsArg string
+	var limit int
 	fs.StringVar(&chainArg, "chain", "", "Filter tokens by chain")
 	fs.StringVar(&tokenArg, "token", "", "Resolve a token by symbol or address")
 	fs.StringVar(&tagsArg, "tags", "", "Filter by LI.FI token tags")
+	fs.IntVar(&limit, "limit", 25, "Maximum number of results (0 = unlimited)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -278,6 +280,10 @@ func (tokensCommand) Run(cfg *config.Config, args []string) error {
 		return filtered[i].ChainID < filtered[j].ChainID
 	})
 
+	if limit > 0 && len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+
 	if cfg.Global.JSON {
 		return writeJSON(filtered)
 	}
@@ -287,9 +293,9 @@ func (tokensCommand) Run(cfg *config.Config, args []string) error {
 		rows = append(rows, []string{
 			strconv.Itoa(token.ChainID),
 			token.Symbol,
-			token.Name,
+			truncateStr(token.Name, 32),
 			strconv.Itoa(token.Decimals),
-			token.Address,
+			truncateAddr(token.Address),
 			formatUSD(token.PriceUSD),
 		})
 	}
@@ -348,7 +354,7 @@ func (vaultsCommand) Run(cfg *config.Config, args []string) error {
 			formatPercent(derefFloat(vault.Analytics.APY30d)),
 			formatUSD(vault.Analytics.TVL.USD),
 			boolText(vault.IsTransactional),
-			vault.Address,
+			truncateAddr(vault.Address),
 		})
 	}
 	printTable([]string{"#", "vault", "protocol", "chain", "asset", "apy", "apy30d", "tvl", "tx", "address"}, rows)
@@ -563,7 +569,7 @@ func (statusCommand) Run(cfg *config.Config, args []string) error {
 		return err
 	}
 	if txHash == "" {
-		return fmt.Errorf("--tx-hash is required")
+		return fmt.Errorf("--tx-hash is required\n\nUsage: %s\nExample: lifi status --tx-hash 0xabc123... --from-chain base", (statusCommand{}).Usage())
 	}
 
 	rt := newRuntime(cfg)
