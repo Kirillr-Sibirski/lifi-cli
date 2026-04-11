@@ -3,8 +3,10 @@ package earn
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -197,23 +199,50 @@ func (c *Client) GetPortfolio(ctx context.Context, address string) (*PortfolioRe
 }
 
 func (c *Client) getJSON(ctx context.Context, endpoint string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "lifi-cli/0.1")
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "lifi-cli/0.1")
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+		resp, err := c.http.Do(req)
+		if err != nil {
+			lastErr = err
+			if shouldRetry(err, 0) && attempt < 2 {
+				time.Sleep(time.Duration(attempt+1) * 200 * time.Millisecond)
+				continue
+			}
+			return err
+		}
 
-	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("earn api error: %s (%s)", resp.Status, strings.TrimSpace(string(body)))
-	}
+		if resp.StatusCode >= 400 {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+			_ = resp.Body.Close()
+			lastErr = fmt.Errorf("earn api error: %s (%s)", resp.Status, strings.TrimSpace(string(body)))
+			if shouldRetry(lastErr, resp.StatusCode) && attempt < 2 {
+				time.Sleep(time.Duration(attempt+1) * 200 * time.Millisecond)
+				continue
+			}
+			return lastErr
+		}
 
-	return json.NewDecoder(resp.Body).Decode(out)
+		decodeErr := json.NewDecoder(resp.Body).Decode(out)
+		_ = resp.Body.Close()
+		if decodeErr != nil {
+			return decodeErr
+		}
+		return nil
+	}
+	return lastErr
+}
+
+func shouldRetry(err error, statusCode int) bool {
+	if statusCode == http.StatusTooManyRequests || statusCode >= 500 {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr)
 }

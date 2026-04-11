@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
@@ -12,9 +13,10 @@ import (
 type doctorCommand struct{}
 
 type doctorCheck struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Detail string `json:"detail,omitempty"`
+	Category string `json:"category,omitempty"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Detail   string `json:"detail,omitempty"`
 }
 
 type doctorResult struct {
@@ -59,16 +61,16 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 	}
 
 	checks := []doctorCheck{
-		httpCheck("earn.li.fi", "https://earn.li.fi/v1/earn/chains"),
-		httpCheck("li.quest", "https://li.quest/v1/chains"),
-		envCheck("LIFI_API_KEY", cfg.APIKey),
+		httpCheck("api", "earn.li.fi", "https://earn.li.fi/v1/earn/chains"),
+		httpCheck("api", "li.quest", "https://li.quest/v1/chains"),
+		envCheck("config", "LIFI_API_KEY", cfg.APIKey),
 		dotEnvCheck(cfg),
 		configPathCheck(cfg),
 	}
 
 	if writeChecks {
-		checks = append(checks, envCheck("LIFI_WALLET_PRIVATE_KEY", cfg.WalletPrivateKey))
-		checks = append(checks, envCheck("LIFI_WALLET_ADDRESS", cfg.WalletAddress))
+		checks = append(checks, envCheck("wallet", cfg.WalletKeyEnvName, cfg.WalletPrivateKey))
+		checks = append(checks, envCheck("wallet", "LIFI_WALLET_ADDRESS", cfg.WalletAddress))
 	}
 
 	if chain != "" || rpcURL != "" {
@@ -96,10 +98,24 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 
 	fmt.Printf("Config path: %s\n", cfg.ResolvedConfigPath)
 	fmt.Printf("Profile:     %s\n\n", cfg.Global.Profile)
-	for _, check := range checks {
-		fmt.Printf("[%s] %s", check.Status, check.Name)
-		if check.Detail != "" {
-			fmt.Printf(": %s", check.Detail)
+	categories := []string{"config", "api", "wallet", "rpc"}
+	for _, category := range categories {
+		filtered := make([]doctorCheck, 0)
+		for _, check := range checks {
+			if check.Category == category {
+				filtered = append(filtered, check)
+			}
+		}
+		if len(filtered) == 0 {
+			continue
+		}
+		fmt.Printf("%s\n", strings.ToUpper(category))
+		for _, check := range filtered {
+			fmt.Printf("  [%s] %s", check.Status, check.Name)
+			if check.Detail != "" {
+				fmt.Printf(": %s", check.Detail)
+			}
+			fmt.Println()
 		}
 		fmt.Println()
 	}
@@ -107,16 +123,16 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 	return nil
 }
 
-func httpCheck(name, url string) doctorCheck {
+func httpCheck(category, name, url string) doctorCheck {
 	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return doctorCheck{Name: name, Status: "fail", Detail: err.Error()}
+		return doctorCheck{Category: category, Name: name, Status: "fail", Detail: err.Error()}
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return doctorCheck{Name: name, Status: "fail", Detail: err.Error()}
+		return doctorCheck{Category: category, Name: name, Status: "fail", Detail: err.Error()}
 	}
 	defer resp.Body.Close()
 
@@ -126,33 +142,34 @@ func httpCheck(name, url string) doctorCheck {
 	}
 
 	return doctorCheck{
-		Name:   name,
-		Status: status,
-		Detail: fmt.Sprintf("HTTP %d", resp.StatusCode),
+		Category: category,
+		Name:     name,
+		Status:   status,
+		Detail:   fmt.Sprintf("HTTP %d", resp.StatusCode),
 	}
 }
 
-func envCheck(name, value string) doctorCheck {
+func envCheck(category, name, value string) doctorCheck {
 	if value == "" {
-		return doctorCheck{Name: name, Status: "warn", Detail: "not set"}
+		return doctorCheck{Category: category, Name: name, Status: "warn", Detail: "not set"}
 	}
 
-	return doctorCheck{Name: name, Status: "ok", Detail: "set"}
+	return doctorCheck{Category: category, Name: name, Status: "ok", Detail: "set"}
 }
 
 func configPathCheck(cfg *config.Config) doctorCheck {
 	if cfg.ConfigExists() {
-		return doctorCheck{Name: "config file", Status: "ok", Detail: cfg.ResolvedConfigPath}
+		return doctorCheck{Category: "config", Name: "config file", Status: "ok", Detail: cfg.ResolvedConfigPath}
 	}
 
-	return doctorCheck{Name: "config file", Status: "warn", Detail: "not found at " + cfg.ResolvedConfigPath}
+	return doctorCheck{Category: "config", Name: "config file", Status: "warn", Detail: "not found at " + cfg.ResolvedConfigPath}
 }
 
 func dotEnvCheck(cfg *config.Config) doctorCheck {
 	if cfg.DotEnvExists() {
-		return doctorCheck{Name: ".env file", Status: "ok", Detail: cfg.DotEnvPath}
+		return doctorCheck{Category: "config", Name: ".env file", Status: "ok", Detail: cfg.DotEnvPath}
 	}
-	return doctorCheck{Name: ".env file", Status: "warn", Detail: "not found at " + cfg.DotEnvPath}
+	return doctorCheck{Category: "config", Name: ".env file", Status: "warn", Detail: "not found at " + cfg.DotEnvPath}
 }
 
 func rpcCheck(chain, rpcURL string) doctorCheck {
@@ -162,8 +179,8 @@ func rpcCheck(chain, rpcURL string) doctorCheck {
 	}
 
 	if rpcURL == "" {
-		return doctorCheck{Name: name, Status: "warn", Detail: "no RPC configured"}
+		return doctorCheck{Category: "rpc", Name: name, Status: "warn", Detail: "no RPC configured"}
 	}
 
-	return doctorCheck{Name: name, Status: "ok", Detail: rpcURL}
+	return doctorCheck{Category: "rpc", Name: name, Status: "ok", Detail: rpcURL}
 }

@@ -343,7 +343,7 @@ func (vaultsCommand) Run(cfg *config.Config, args []string) error {
 			strconv.Itoa(i + 1),
 			vault.Name,
 			vault.Protocol.Name,
-			vault.Network,
+			fmt.Sprintf("%s (%d)", vault.Network, vault.ChainID),
 			underlyingSymbol(vault),
 			formatPercent(vault.Analytics.APY.Total),
 			formatPercent(derefFloat(vault.Analytics.APY30d)),
@@ -400,6 +400,12 @@ func (inspectCommand) Run(cfg *config.Config, args []string) error {
 		{"deposit packs", strings.Join(packNames(vault.DepositPacks), ", ")},
 		{"redeem packs", strings.Join(packNames(vault.RedeemPacks), ", ")},
 		{"synced at", vault.SyncedAt},
+	}
+	if vault.Analytics.TVL.USD == "" {
+		rows = append(rows, []string{"warning", "TVL data missing"})
+	}
+	if vault.Analytics.APY.Total == 0 {
+		rows = append(rows, []string{"warning", "APY data may be incomplete"})
 	}
 	printTable([]string{"field", "value"}, rows)
 	return nil
@@ -514,14 +520,20 @@ func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 		return writeJSON(filtered)
 	}
 
-	fmt.Printf("positions: %d\n", len(filtered))
+	rows := make([][]string, 0, len(filtered))
 	for index, position := range filtered {
-		fmt.Printf("\n[%d]\n", index+1)
-		blob, err := prettyJSON(position)
-		if err != nil {
-			return err
+		rows = append(rows, portfolioSummaryRow(index+1, position))
+	}
+	printTable([]string{"#", "chain", "protocol", "asset", "balance", "value"}, rows)
+	if cfg.Global.Verbose {
+		for index, position := range filtered {
+			fmt.Printf("\n[%d]\n", index+1)
+			blob, err := prettyJSON(position)
+			if err != nil {
+				return err
+			}
+			fmt.Println(blob)
 		}
-		fmt.Println(blob)
 	}
 	return nil
 }
@@ -603,11 +615,15 @@ func (statusCommand) Run(cfg *config.Config, args []string) error {
 				return writeJSON(payload)
 			}
 		} else {
-			blob, err := prettyJSON(payload)
-			if err != nil {
-				return err
+			printTable([]string{"field", "value"}, statusSummaryRows(payload))
+			if cfg.Global.Verbose {
+				fmt.Println()
+				blob, err := prettyJSON(payload)
+				if err != nil {
+					return err
+				}
+				fmt.Println(blob)
 			}
-			fmt.Println(blob)
 		}
 
 		if !watch || isTerminalStatus(payload) {
@@ -786,4 +802,55 @@ func isTerminalStatus(payload map[string]any) bool {
 	default:
 		return false
 	}
+}
+
+func portfolioSummaryRow(index int, position map[string]any) []string {
+	assetSymbol := "-"
+	if asset, ok := position["asset"].(map[string]any); ok {
+		if symbol := strings.TrimSpace(fmt.Sprint(asset["symbol"])); symbol != "" {
+			assetSymbol = symbol
+		}
+	}
+	return []string{
+		strconv.Itoa(index),
+		emptyFallback(chainLabelForPosition(position)),
+		emptyFallback(strings.TrimSpace(fmt.Sprint(position["protocolName"]))),
+		assetSymbol,
+		emptyFallback(strings.TrimSpace(fmt.Sprint(position["balanceNative"]))),
+		emptyFallback(strings.TrimSpace(fmt.Sprint(position["valueUsd"]))),
+	}
+}
+
+func chainLabelForPosition(position map[string]any) string {
+	chainID := strings.TrimSpace(fmt.Sprint(position["chainId"]))
+	if chainID == "" || chainID == "<nil>" {
+		return ""
+	}
+	return chainID
+}
+
+func statusSummaryRows(payload map[string]any) [][]string {
+	rows := [][]string{
+		{"status", fmt.Sprint(payload["status"])},
+	}
+	if value := strings.TrimSpace(fmt.Sprint(payload["substatus"])); value != "" && value != "<nil>" {
+		rows = append(rows, []string{"substatus", value})
+	}
+	if value := strings.TrimSpace(fmt.Sprint(payload["bridge"])); value != "" && value != "<nil>" {
+		rows = append(rows, []string{"bridge", value})
+	}
+	if sending, ok := payload["sending"].(map[string]any); ok {
+		if txHash := strings.TrimSpace(fmt.Sprint(sending["txHash"])); txHash != "" && txHash != "<nil>" {
+			rows = append(rows, []string{"sending tx", txHash})
+		}
+	}
+	if receiving, ok := payload["receiving"].(map[string]any); ok {
+		if txHash := strings.TrimSpace(fmt.Sprint(receiving["txHash"])); txHash != "" && txHash != "<nil>" {
+			rows = append(rows, []string{"receiving tx", txHash})
+		}
+	}
+	if tool := strings.TrimSpace(fmt.Sprint(payload["tool"])); tool != "" && tool != "<nil>" {
+		rows = append(rows, []string{"tool", tool})
+	}
+	return rows
 }
