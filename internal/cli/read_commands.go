@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/earn"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/lifiapi"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/earn"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
 
 type chainsCommand struct{}
@@ -570,18 +571,25 @@ func (statusCommand) Run(cfg *config.Config, args []string) error {
 	}
 
 	for {
-		payload, err := rt.lifiClient.GetStatus(ctx, lifiapi.StatusRequest{
+		pollCtx, pollCancel := context.WithTimeout(context.Background(), 20*time.Second)
+		payload, err := rt.lifiClient.GetStatus(pollCtx, lifiapi.StatusRequest{
 			TxHash:    txHash,
 			Bridge:    bridge,
 			FromChain: fromChainID,
 			ToChain:   toChainID,
 		})
+		pollCancel()
 		if err != nil {
 			return err
 		}
 
 		if cfg.Global.JSON {
-			if !watch {
+			if watch {
+				encoder := json.NewEncoder(osStdout{})
+				if err := encoder.Encode(payload); err != nil {
+					return err
+				}
+			} else {
 				return writeJSON(payload)
 			}
 		} else {

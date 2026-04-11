@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/cli"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/cli"
 )
 
 func main() {

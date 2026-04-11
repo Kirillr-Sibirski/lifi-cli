@@ -34,6 +34,14 @@ go build -o bin/lifi ./cmd/lifi
 
 Homebrew packaging is planned, but the source build is the current install path.
 
+### Release archives
+
+macOS and Linux release archives are configured with GoReleaser.
+
+```bash
+goreleaser release --snapshot --clean
+```
+
 ## Quick start
 
 1. Copy `.env.example` to `.env`.
@@ -80,6 +88,16 @@ lifi deposit \
   --verify-position
 
 lifi portfolio 0xYourWallet
+```
+
+## Shell completion
+
+Generate completion scripts directly from the CLI:
+
+```bash
+source <(lifi completion bash)
+source <(lifi completion zsh)
+lifi completion fish > ~/.config/fish/completions/lifi.fish
 ```
 
 ## How it works
@@ -452,6 +470,7 @@ rpcs:
 - available on all major commands
 - stable field names for scripts and agents
 - no extra stdout noise when `--json` is enabled
+- `deposit --dry-run --json` returns quote, balance, and approval readiness as a single payload
 
 ## Safety
 
@@ -497,11 +516,14 @@ Implemented and live-tested:
 - `allowance`
 - `portfolio`
 - `deposit --dry-run`
+- `completion`
 
 Implemented but not live-tested in this repo session because they require a real wallet key:
 
 - `approve`
 - `deposit`
+
+Release scaffolding is also in place for macOS and Linux builds through GoReleaser.
 
 ## Example workflows
 

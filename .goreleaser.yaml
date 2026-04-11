@@ -1,0 +1,40 @@
+version: 2
+
+project_name: lifi
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: lifi
+    main: ./cmd/lifi
+    binary: lifi
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/Kirillr-Sibirski/lifi-cli/internal/cli.version={{ .Version }}
+
+archives:
+  - id: lifi-archives
+    builds:
+      - lifi
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{- if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: git

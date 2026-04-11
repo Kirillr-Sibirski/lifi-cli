@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 )
 
 type versionCommand struct{}

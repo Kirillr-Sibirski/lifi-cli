@@ -1,4 +1,4 @@
-module github.com/Kirillr-Sibirski/defi-mullet
+module github.com/Kirillr-Sibirski/lifi-cli
 
 go 1.25.7
 

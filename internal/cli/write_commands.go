@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/evm"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/lifiapi"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/evm"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
 
 type allowanceCommand struct{}
@@ -319,25 +319,42 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 		approvalNeeded = allowance.Cmp(required) < 0
 	}
 
-	if cfg.Global.JSON {
-		return writeJSON(map[string]any{
-			"quote":             quote,
-			"balance":           balance.String(),
-			"balance_formatted": formatAmount(balance.String(), fromToken.Decimals, 6),
-			"approval_needed":   approvalNeeded,
-			"dry_run":           dryRun,
-		})
+	mode := strings.ToLower(strings.TrimSpace(approveMode))
+	switch mode {
+	case "auto", "always", "never":
+	default:
+		return fmt.Errorf("--approve must be one of auto, always, or never")
+	}
+	if mode == "always" && !evm.IsNativeToken(fromToken.Address) {
+		approvalNeeded = true
+	}
+	if mode == "never" && approvalNeeded && !dryRun {
+		return fmt.Errorf("approval is required but --approve=never was set")
 	}
 
-	printTable([]string{"field", "value"}, quoteSummaryRows(quote))
-	fmt.Println()
-	printTable([]string{"field", "value"}, [][]string{
-		{"wallet", walletAddress},
-		{"balance", formatAmount(balance.String(), fromToken.Decimals, 6)},
-		{"approval needed", boolText(approvalNeeded)},
-		{"dry run", boolText(dryRun)},
-	})
+	result := map[string]any{
+		"quote":             quote,
+		"wallet":            walletAddress,
+		"balance":           balance.String(),
+		"balance_formatted": formatAmount(balance.String(), fromToken.Decimals, 6),
+		"approval_needed":   approvalNeeded,
+		"dry_run":           dryRun,
+	}
+
+	if !cfg.Global.JSON {
+		printTable([]string{"field", "value"}, quoteSummaryRows(quote))
+		fmt.Println()
+		printTable([]string{"field", "value"}, [][]string{
+			{"wallet", walletAddress},
+			{"balance", formatAmount(balance.String(), fromToken.Decimals, 6)},
+			{"approval needed", boolText(approvalNeeded)},
+			{"dry run", boolText(dryRun)},
+		})
+	}
 	if dryRun {
+		if cfg.Global.JSON {
+			return writeJSON(result)
+		}
 		return nil
 	}
 
@@ -361,37 +378,56 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 		if err != nil {
 			return err
 		}
-		if _, err := evm.WaitForReceipt(ctx, client, hash, 3*time.Second); err != nil {
+		result["approval_tx_hash"] = hash.Hex()
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		receipt, err := evm.WaitForReceipt(waitCtx, client, hash, 3*time.Second)
+		waitCancel()
+		if err != nil {
 			return err
 		}
+		result["approval_receipt_status"] = receipt.Status
 	}
 
 	hash, err := evm.SendQuoteTransaction(ctx, client, wallet, quote.TransactionRequest)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("deposit transaction sent: %s\n", hash.Hex())
+	result["tx_hash"] = hash.Hex()
+	if !cfg.Global.JSON {
+		fmt.Printf("deposit transaction sent: %s\n", hash.Hex())
+	}
 	if !wait && !verifyPosition {
+		if cfg.Global.JSON {
+			return writeJSON(result)
+		}
 		return nil
 	}
 
-	receipt, err := evm.WaitForReceipt(context.Background(), client, hash, 3*time.Second)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	receipt, err := evm.WaitForReceipt(waitCtx, client, hash, 3*time.Second)
+	waitCancel()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("source receipt status: %d\n", receipt.Status)
+	result["receipt_status"] = receipt.Status
+	if !cfg.Global.JSON {
+		fmt.Printf("source receipt status: %d\n", receipt.Status)
+	}
 
 	if quote.Action.FromChainID != quote.Action.ToChainID {
-		statusPayload, err := rt.lifiClient.GetStatus(context.Background(), lifiapi.StatusRequest{
+		statusPayload, err := waitForExecutionStatus(rt, lifiapi.StatusRequest{
 			TxHash:    hash.Hex(),
 			Bridge:    quote.Tool,
 			FromChain: quote.Action.FromChainID,
 			ToChain:   quote.Action.ToChainID,
-		})
+		}, 8*time.Second, 5*time.Minute)
 		if err == nil {
-			fmt.Println("cross-chain status")
-			blob, _ := prettyJSON(statusPayload)
-			fmt.Println(blob)
+			result["status"] = statusPayload
+			if !cfg.Global.JSON {
+				fmt.Println("cross-chain status")
+				blob, _ := prettyJSON(statusPayload)
+				fmt.Println(blob)
+			}
 		}
 	}
 
@@ -400,11 +436,86 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 		if err != nil {
 			return err
 		}
-		portfolio, err := rt.earnClient.GetPortfolio(context.Background(), walletAddress)
+		found, positions, err := waitForPortfolioPosition(rt, walletAddress, vault.Address, 5*time.Second, time.Minute)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("position detected: %s\n", boolText(findVaultInPositions(portfolio.Positions, vault.Address)))
+		result["position_detected"] = found
+		result["positions"] = positions
+		if !cfg.Global.JSON {
+			fmt.Printf("position detected: %s\n", boolText(found))
+		}
+	}
+	if cfg.Global.JSON {
+		return writeJSON(result)
 	}
 	return nil
+}
+
+func waitForExecutionStatus(rt *runtime, request lifiapi.StatusRequest, interval, timeout time.Duration) (map[string]any, error) {
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	if timeout <= 0 {
+		timeout = 2 * time.Minute
+	}
+
+	deadline := time.Now().Add(timeout)
+	var last map[string]any
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		payload, err := rt.lifiClient.GetStatus(ctx, request)
+		cancel()
+		if err == nil {
+			last = payload
+			if isTerminalStatus(payload) {
+				return payload, nil
+			}
+		}
+
+		if time.Now().After(deadline) {
+			if last != nil {
+				return last, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("timed out waiting for LI.FI execution status")
+		}
+		time.Sleep(interval)
+	}
+}
+
+func waitForPortfolioPosition(rt *runtime, walletAddress, vaultAddress string, interval, timeout time.Duration) (bool, []map[string]any, error) {
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	if timeout <= 0 {
+		timeout = time.Minute
+	}
+
+	deadline := time.Now().Add(timeout)
+	var last []map[string]any
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		portfolio, err := rt.earnClient.GetPortfolio(ctx, walletAddress)
+		cancel()
+		if err == nil {
+			last = portfolio.Positions
+			if findVaultInPositions(portfolio.Positions, vaultAddress) {
+				return true, portfolio.Positions, nil
+			}
+		}
+
+		if time.Now().After(deadline) {
+			if last != nil {
+				return findVaultInPositions(last, vaultAddress), last, nil
+			}
+			if err != nil {
+				return false, nil, err
+			}
+			return false, nil, fmt.Errorf("timed out waiting for portfolio update")
+		}
+		time.Sleep(interval)
+	}
 }

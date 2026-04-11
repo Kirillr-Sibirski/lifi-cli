@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/lifiapi"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
 
 type quoteCommand struct{}

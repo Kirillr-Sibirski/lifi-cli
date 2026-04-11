@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/lifiapi"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
 
 const erc20ABI = `[
@@ -169,7 +169,7 @@ func Approve(ctx context.Context, client *ethclient.Client, wallet *Wallet, chai
 		Data:     data,
 	})
 
-	signed, err := types.SignTx(tx, types.NewPragueSigner(chainID), wallet.PrivateKey)
+	signed, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), wallet.PrivateKey)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -212,7 +212,7 @@ func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet 
 		Data:     data,
 	})
 
-	signed, err := types.SignTx(tx, types.NewPragueSigner(chainID), wallet.PrivateKey)
+	signed, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), wallet.PrivateKey)
 	if err != nil {
 		return common.Hash{}, err
 	}

@@ -17,10 +17,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/earn"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/evm"
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/lifiapi"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/earn"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/evm"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
 
 type runtime struct {

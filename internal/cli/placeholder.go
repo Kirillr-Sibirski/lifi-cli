@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 )
 
 type optionKind string

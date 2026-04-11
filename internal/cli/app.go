@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Kirillr-Sibirski/defi-mullet/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 )
 
-const version = "0.1.0-dev"
+var version = "0.1.0-dev"
 
 type Command interface {
 	Name() string
