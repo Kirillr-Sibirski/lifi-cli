@@ -10,7 +10,7 @@ import (
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 )
 
-var version = "0.1.3"
+var version = "0.1.4"
 
 type Command interface {
 	Name() string

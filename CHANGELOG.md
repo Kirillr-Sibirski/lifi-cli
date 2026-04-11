@@ -4,6 +4,18 @@ All notable changes to `lifi` are documented here.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-04-11
+
+- Fixed pixel art bridge banner (string replacement was corrupting the 8-block
+  pattern by matching the 6-block substring first; lines are now constructed directly).
+- Truncated vault and token addresses to `0x1d3b1c…4657` format in all table output.
+- Truncated protocol URL column to 48 chars to prevent terminal overflow.
+- Added `--limit 25` default to `lifi tokens` (was returning 70+ rows unbounded).
+- Added actionable usage hints to `--vault`, `--tx-hash` required errors.
+- Added Roadmap section to README.
+- Rewrote README as a single bare-bones developer reference with actual sample
+  output, no hunting through separate docs files.
+
 ## [0.1.3] - 2026-04-11
 
 - Replaced plain `tabwriter` output with a styled table renderer using box-drawing

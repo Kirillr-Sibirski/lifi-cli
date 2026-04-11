@@ -353,6 +353,32 @@ The portfolio index may take a moment to update. Retry with `lifi portfolio 0xYo
 
 ---
 
+## Roadmap
+
+`lifi-cli` is at v0.1 — the core read and deposit flows are solid. Here's what comes next.
+
+### Near-term
+
+- **`lifi withdraw`** — redeem vault positions from the CLI, symmetrical to `deposit`
+- **`lifi watch`** — live-polling mode for `portfolio` and `status`, streaming updates to the terminal
+- **`lifi sweep`** — consolidate multiple small positions into one vault in a single command
+- **Ledger / hardware wallet support** — sign transactions via USB without exposing a raw private key
+
+### Medium-term
+
+- **Recurring deposits** — cron-style automation: `lifi schedule --vault 0x... --amount 50 --every 1w`
+- **Multi-hop strategies** — chain together a swap + bridge + deposit in one command using the Composer API
+- **Position alerts** — notify (webhook, email) when APY drops below a threshold or a position reaches a target value
+- **`--output csv|tsv`** — tabular export for spreadsheet workflows alongside existing `--json`
+
+### Longer-term
+
+- **Plugin / hook system** — let third-party scripts tap into the preflight and post-execution lifecycle
+- **TUI dashboard** — an interactive terminal UI (`lifi tui`) with a vault browser, live APY feed, and portfolio overview
+- **EigenLayer / restaking integrations** — extend Earn commands to cover restaking protocols as LI.FI adds support
+
+---
+
 ## Development
 
 ```bash
