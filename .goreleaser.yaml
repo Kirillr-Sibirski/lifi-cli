@@ -38,16 +38,3 @@ snapshot:
 
 changelog:
   use: git
-
-brews:
-  - repository:
-      owner: Kirillr-Sibirski
-      name: homebrew-lifi
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
-    homepage: "https://github.com/Kirillr-Sibirski/lifi-cli"
-    description: "CLI for LI.FI Earn and Composer"
-    install: |
-      bin.install "lifi"
-    test: |
-      system "#{bin}/lifi", "version"

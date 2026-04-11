@@ -1,6 +1,6 @@
-# lifi
+# lifi-cli
 
-CLI for LI.FI Earn and Composer.
+Home of the `lifi` CLI for LI.FI Earn and Composer.
 
 `lifi` is a macOS/Linux command-line tool for discovering vaults, generating Composer quotes, running deposits, and verifying portfolio positions without building a frontend first.
 
@@ -17,14 +17,16 @@ go build -o bin/lifi ./cmd/lifi
 
 ### Homebrew
 
-Homebrew releases are wired through GitHub Releases and a separate tap:
+The `lifi-cli` repository acts as the Homebrew tap. Install the latest `main`
+build with:
 
 ```bash
-brew tap Kirillr-Sibirski/lifi
-brew install lifi
+brew tap Kirillr-Sibirski/lifi-cli https://github.com/Kirillr-Sibirski/lifi-cli
+brew install --HEAD lifi
 ```
 
-The tap is populated by the release workflow described in [docs/release.md](docs/release.md).
+Stable Homebrew installs are cut from tagged releases and documented in
+[docs/release.md](docs/release.md).
 
 ## Quick start
 
