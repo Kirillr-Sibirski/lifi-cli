@@ -6,10 +6,16 @@ import (
 )
 
 const lifiBanner = `
- __    ___ _____ ___    ____ _     ___ 
+   ██████                     ██████
+  ████████━━━━━━━━━━━━━━━━━━━████████
+  ████████  c r o s s ─ c h a i n
+  ████████━━━━━━━━━━━━━━━━━━━████████
+   ██████                     ██████
+
+ __    ___ _____ ___    ____ _     ___
 |  |  |_ _|  ___|_ _|  / ___| |   |_ _|
-|  |   | || |_   | |  | |   | |    | | 
-|  |___| ||  _|  | |  | |___| |___ | | 
+|  |   | || |_   | |  | |   | |    | |
+|  |___| ||  _|  | |  | |___| |___ | |
 |______|___|_|   |___|  \____|_____|___|
 `
 
@@ -26,12 +32,26 @@ func brandBanner(noColor bool) string {
 		return banner + "li.fi cli | earn + composer for builders\n"
 	}
 	lines := strings.Split(strings.TrimRight(banner, "\n"), "\n")
+	// First 5 lines are the bridge pixel art, rest is the text logo.
 	for i, line := range lines {
 		switch {
-		case i == 0 || i == len(lines)-1:
-			lines[i] = colorize(line, "38;5;213;1", false)
+		case i < 5:
+			// Bridge pixel art — bright magenta blocks, dim bridge line
+			colored := strings.ReplaceAll(line, "██████", colorize("██████", "38;5;213;1", false))
+			colored = strings.ReplaceAll(colored, "████████", colorize("████████", "38;5;205;1", false))
+			colored = strings.ReplaceAll(colored, "━", colorize("━", "38;5;241", false))
+			colored = strings.ReplaceAll(colored, "─", colorize("─", "38;5;241", false))
+			colored = strings.ReplaceAll(colored, "c r o s s ─ c h a i n", colorize("c r o s s ─ c h a i n", "38;5;241", false))
+			lines[i] = colored
+		case i == 5:
+			lines[i] = line // blank separator
 		default:
-			lines[i] = colorize(line, "38;5;205;1", false)
+			// Text logo — alternating pink shades
+			if i%2 == 0 {
+				lines[i] = colorize(line, "38;5;213;1", false)
+			} else {
+				lines[i] = colorize(line, "38;5;205;1", false)
+			}
 		}
 	}
 	tagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| earn + composer for builders", "38;5;250", false)

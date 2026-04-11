@@ -29,6 +29,7 @@ func Run(args []string) int {
 	}
 
 	cfg, err := config.Load(global)
+	tableNoColor = global.NoColor
 	if err != nil {
 		if global.JSON {
 			_ = writeJSON(apperror.JSONPayload(apperror.Wrap("config", apperror.ExitConfig, err)))

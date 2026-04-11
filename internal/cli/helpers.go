@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -101,7 +100,7 @@ func (rt *runtime) resolveChain(ctx context.Context, value string) (*lifiapi.Cha
 		value = rt.cfg.DefaultFromChain
 	}
 	if strings.TrimSpace(value) == "" {
-		return nil, errors.New("chain is required")
+		return nil, errors.New("chain is required; pass --chain <name-or-id> or set LIFI_DEFAULT_FROM_CHAIN in .env\nRun `lifi chains` to see available chains")
 	}
 
 	chains, err := rt.loadChains(ctx)
@@ -110,6 +109,8 @@ func (rt *runtime) resolveChain(ctx context.Context, value string) (*lifiapi.Cha
 	}
 
 	needle := normalizeLookup(value)
+
+	// Exact matches first
 	for _, chain := range chains {
 		switch {
 		case strconv.Itoa(chain.ID) == value:
@@ -123,7 +124,29 @@ func (rt *runtime) resolveChain(ctx context.Context, value string) (*lifiapi.Cha
 		}
 	}
 
-	return nil, fmt.Errorf("unknown chain %q", value)
+	// Fuzzy fallback: prefix or substring match on name/key
+	var candidates []lifiapi.Chain
+	for _, chain := range chains {
+		normName := normalizeLookup(chain.Name)
+		normKey := normalizeLookup(chain.Key)
+		if strings.HasPrefix(normName, needle) || strings.HasPrefix(normKey, needle) ||
+			strings.Contains(normName, needle) {
+			candidates = append(candidates, chain)
+		}
+	}
+	if len(candidates) == 1 {
+		return &candidates[0], nil
+	}
+	if len(candidates) > 1 {
+		limit := min(5, len(candidates))
+		hints := make([]string, limit)
+		for i := 0; i < limit; i++ {
+			hints[i] = fmt.Sprintf("%s (key: %s)", candidates[i].Name, candidates[i].Key)
+		}
+		return nil, fmt.Errorf("chain %q is ambiguous; did you mean one of:\n  %s\nRun `lifi chains` to see all available chains", value, strings.Join(hints, "\n  "))
+	}
+
+	return nil, fmt.Errorf("unknown chain %q\nRun `lifi chains` to see available chains and their keys", value)
 }
 
 func (rt *runtime) resolveVault(ctx context.Context, value string) (*earn.Vault, error) {
@@ -149,7 +172,7 @@ func (rt *runtime) resolveVault(ctx context.Context, value string) (*earn.Vault,
 
 func (rt *runtime) resolveToken(ctx context.Context, chain *lifiapi.Chain, value string) (*lifiapi.Token, error) {
 	if strings.TrimSpace(value) == "" {
-		return nil, errors.New("token is required")
+		return nil, fmt.Errorf("--token is required; pass a symbol (e.g. USDC, ETH) or a token address\nRun `lifi tokens --chain %s` to browse available tokens", chain.Key)
 	}
 
 	if evm.IsNativeToken(value) || normalizeLookup(value) == normalizeLookup(chain.Coin) || normalizeLookup(value) == normalizeLookup(chain.NativeToken.Symbol) {
@@ -176,7 +199,7 @@ func (rt *runtime) resolveToken(ctx context.Context, chain *lifiapi.Chain, value
 		}
 	}
 
-	return nil, fmt.Errorf("token %q not found on %s", value, chain.Name)
+	return nil, fmt.Errorf("token %q not found on %s\nRun `lifi tokens --chain %s --token %s` to search for it", value, chain.Name, chain.Key, value)
 }
 
 func (rt *runtime) tokensForChain(ctx context.Context, chainID int) ([]lifiapi.Token, error) {
@@ -359,13 +382,69 @@ func boolText(value bool) string {
 	return "no"
 }
 
+// tableNoColor is set by app.Run once the config is loaded.
+var tableNoColor bool
+
 func printTable(headers []string, rows [][]string) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
-	for _, row := range rows {
-		fmt.Fprintln(w, strings.Join(row, "\t"))
+	cols := len(headers)
+	if cols == 0 {
+		return
 	}
-	_ = w.Flush()
+	widths := make([]int, cols)
+	for i, h := range headers {
+		widths[i] = len(h)
+	}
+	for _, row := range rows {
+		for i := 0; i < len(row) && i < cols; i++ {
+			if w := len(row[i]); w > widths[i] {
+				widths[i] = w
+			}
+		}
+	}
+
+	sep := colorize("│", "90", tableNoColor)
+
+	// Header row
+	hParts := make([]string, cols)
+	for i, h := range headers {
+		cell := fmt.Sprintf(" %-*s ", widths[i], h)
+		hParts[i] = colorize(cell, "1", tableNoColor)
+	}
+	fmt.Println(strings.Join(hParts, sep))
+
+	// Divider
+	divParts := make([]string, cols)
+	for i, w := range widths {
+		divParts[i] = strings.Repeat("─", w+2)
+	}
+	fmt.Println(colorize(strings.Join(divParts, "┼"), "90", tableNoColor))
+
+	// Data rows
+	for _, row := range rows {
+		parts := make([]string, cols)
+		for i := 0; i < cols; i++ {
+			cell := ""
+			if i < len(row) {
+				cell = row[i]
+			}
+			padded := fmt.Sprintf(" %-*s ", widths[i], cell)
+			parts[i] = styledTableCell(padded, cell)
+		}
+		fmt.Println(strings.Join(parts, sep))
+	}
+}
+
+func styledTableCell(padded, raw string) string {
+	if tableNoColor {
+		return padded
+	}
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "yes":
+		return colorize(padded, "32", false)
+	case "no":
+		return colorize(padded, "90", false)
+	}
+	return padded
 }
 
 func promptConfirm(message string) (bool, error) {

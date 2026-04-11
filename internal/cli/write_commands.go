@@ -158,6 +158,13 @@ func (approveCommand) Run(cfg *config.Config, args []string) error {
 		return err
 	}
 
+	if tokenArg == "" {
+		return fmt.Errorf("--token is required\n\nUsage: %s\nExample: lifi approve --chain base --token USDC --spender 0x1231... --amount 100", (approveCommand{}).Usage())
+	}
+	if spender == "" {
+		return fmt.Errorf("--spender is required\n\nUsage: %s", (approveCommand{}).Usage())
+	}
+
 	rt := newRuntime(cfg)
 	ctx, cancel := rt.context()
 	defer cancel()
@@ -172,9 +179,6 @@ func (approveCommand) Run(cfg *config.Config, args []string) error {
 	}
 	if evm.IsNativeToken(token.Address) {
 		return fmt.Errorf("native tokens do not require approval")
-	}
-	if spender == "" {
-		return fmt.Errorf("--spender is required")
 	}
 
 	wallet, err := rt.wallet()
