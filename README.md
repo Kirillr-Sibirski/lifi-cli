@@ -257,6 +257,7 @@ Safety defaults:
 - write commands prompt unless `--yes` is set
 - `deposit --simulate` is enabled by default
 - `deposit --dry-run` never broadcasts
+- simulations are skipped automatically when an approval must happen first
 - approvals are controlled by `--approve auto|always|never`
 - approval sizing is controlled by `--approval-amount exact|infinite`
 - gas behavior is controlled by `--gas-policy auto|quote|rpc`
@@ -292,6 +293,9 @@ Check the token, chain, amount, and vault again with:
 lifi quote ...
 lifi deposit ... --dry-run --json
 ```
+
+If `approval_needed` is `true`, the preflight may report
+`simulation_status: "skipped"` until approval is granted.
 
 ### `position detected: no`
 

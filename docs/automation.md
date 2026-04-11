@@ -45,3 +45,5 @@ Expect these fields in machine output:
 - `approval_tx_hash`
 - `position_detected`
 - `preflight`
+- `preflight.simulation_status`
+- `preflight.simulation_message`

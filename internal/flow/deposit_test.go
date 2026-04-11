@@ -20,6 +20,7 @@ type fakeExecutor struct {
 	nativeBalance *big.Int
 	allowance     *big.Int
 	simulatedGas  uint64
+	simulateErr   error
 	quoteFee      *evm.FeeEstimate
 	approvalFee   *evm.FeeEstimate
 	sendErr       error
@@ -37,6 +38,9 @@ func (f *fakeExecutor) Allowance(context.Context, string, common.Address, common
 	return new(big.Int).Set(f.allowance), nil
 }
 func (f *fakeExecutor) SimulateQuote(context.Context, lifiapi.TransactionRequest, common.Address) (uint64, error) {
+	if f.simulateErr != nil {
+		return 0, f.simulateErr
+	}
 	return f.simulatedGas, nil
 }
 func (f *fakeExecutor) EstimateQuoteFee(context.Context, lifiapi.TransactionRequest, string) (*evm.FeeEstimate, error) {
@@ -76,7 +80,7 @@ func TestExecuteDepositDryRunShowsApprovalNeeded(t *testing.T) {
 		tokenBalance:  big.NewInt(2_000_000),
 		nativeBalance: big.NewInt(1_000_000_000_000_000),
 		allowance:     big.NewInt(0),
-		simulatedGas:  200000,
+		simulateErr:   errors.New("simulation should be skipped until approval exists"),
 		quoteFee:      &evm.FeeEstimate{GasLimit: 200000, EstimatedCost: big.NewInt(1000)},
 		approvalFee:   &evm.FeeEstimate{GasLimit: 65000, EstimatedCost: big.NewInt(1000)},
 	}
@@ -99,6 +103,45 @@ func TestExecuteDepositDryRunShowsApprovalNeeded(t *testing.T) {
 	}
 	if result.Preflight == nil || !result.Preflight.ApprovalNeeded {
 		t.Fatalf("expected preflight approval_needed to be true")
+	}
+	if result.Preflight.SimulationStatus != "skipped" {
+		t.Fatalf("expected simulation to be skipped, got %#v", result.Preflight)
+	}
+}
+
+func TestExecuteDepositSimulatesWhenApprovalAlreadySatisfied(t *testing.T) {
+	t.Parallel()
+
+	executor := &fakeExecutor{
+		tokenBalance:  big.NewInt(2_000_000),
+		nativeBalance: big.NewInt(1_000_000_000_000_000),
+		allowance:     big.NewInt(2_000_000),
+		simulatedGas:  210000,
+		quoteFee:      &evm.FeeEstimate{GasLimit: 200000, EstimatedCost: big.NewInt(1000)},
+		approvalFee:   &evm.FeeEstimate{GasLimit: 65000, EstimatedCost: big.NewInt(1000)},
+	}
+
+	result, err := ExecuteDeposit(context.Background(), DepositRequest{
+		Quote:              sampleQuote(),
+		Vault:              sampleVault(),
+		FromChain:          sampleChain(),
+		FromToken:          sampleToken(),
+		WalletAddress:      "0x1111111111111111111111111111111111111111",
+		Executor:           executor,
+		DryRun:             true,
+		Simulate:           true,
+		ApproveMode:        "auto",
+		ApprovalAmountMode: "exact",
+		GasPolicy:          "auto",
+	})
+	if err != nil {
+		t.Fatalf("ExecuteDeposit returned error: %v", err)
+	}
+	if result.Preflight == nil {
+		t.Fatalf("expected preflight")
+	}
+	if result.Preflight.SimulationStatus != "ok" || result.Preflight.SimulatedGasLimit != 210000 {
+		t.Fatalf("expected simulation to run, got %#v", result.Preflight)
 	}
 }
 

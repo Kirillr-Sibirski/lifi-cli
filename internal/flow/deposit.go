@@ -80,6 +80,8 @@ type Preflight struct {
 	EstimatedGasFormatted  string `json:"estimated_gas_formatted"`
 	QuoteGasLimit          uint64 `json:"quote_gas_limit"`
 	SimulatedGasLimit      uint64 `json:"simulated_gas_limit,omitempty"`
+	SimulationStatus       string `json:"simulation_status,omitempty"`
+	SimulationMessage      string `json:"simulation_message,omitempty"`
 }
 
 type Result struct {
@@ -188,10 +190,18 @@ func ExecuteDeposit(ctx context.Context, in DepositRequest) (*Result, error) {
 	}
 
 	var simulatedGasLimit uint64
+	simulationStatus := "disabled"
+	simulationMessage := ""
 	if in.Simulate {
-		simulatedGasLimit, err = in.Executor.SimulateQuote(ctx, in.Quote.TransactionRequest, common.HexToAddress(in.WalletAddress))
-		if err != nil {
-			return nil, apperror.Wrap("execution", apperror.ExitExecution, fmt.Errorf("simulation failed: %w", err))
+		if approvalNeeded && approveMode != "never" {
+			simulationStatus = "skipped"
+			simulationMessage = "skipped until approval is granted"
+		} else {
+			simulatedGasLimit, err = in.Executor.SimulateQuote(ctx, in.Quote.TransactionRequest, common.HexToAddress(in.WalletAddress))
+			if err != nil {
+				return nil, apperror.Wrap("execution", apperror.ExitExecution, fmt.Errorf("simulation failed: %w", err))
+			}
+			simulationStatus = "ok"
 		}
 	}
 
@@ -237,6 +247,8 @@ func ExecuteDeposit(ctx context.Context, in DepositRequest) (*Result, error) {
 		EstimatedGasFormatted:  formatAmount(totalGasCost.String(), in.FromChain.NativeToken.Decimals, 6),
 		QuoteGasLimit:          quoteFee.GasLimit,
 		SimulatedGasLimit:      simulatedGasLimit,
+		SimulationStatus:       simulationStatus,
+		SimulationMessage:      simulationMessage,
 	}
 	if in.DryRun {
 		result.Stage = "dry-run"
