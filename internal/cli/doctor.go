@@ -62,6 +62,7 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 		httpCheck("earn.li.fi", "https://earn.li.fi"),
 		httpCheck("li.quest", "https://li.quest/v1/info"),
 		envCheck("LIFI_API_KEY", cfg.APIKey),
+		dotEnvCheck(cfg),
 		configPathCheck(cfg),
 	}
 
@@ -145,6 +146,13 @@ func configPathCheck(cfg *config.Config) doctorCheck {
 	}
 
 	return doctorCheck{Name: "config file", Status: "warn", Detail: "not found at " + cfg.ResolvedConfigPath}
+}
+
+func dotEnvCheck(cfg *config.Config) doctorCheck {
+	if cfg.DotEnvExists() {
+		return doctorCheck{Name: ".env file", Status: "ok", Detail: cfg.DotEnvPath}
+	}
+	return doctorCheck{Name: ".env file", Status: "warn", Detail: "not found at " + cfg.DotEnvPath}
 }
 
 func rpcCheck(chain, rpcURL string) doctorCheck {

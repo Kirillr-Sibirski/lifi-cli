@@ -21,38 +21,37 @@ This makes the CLI useful for:
 
 ## Install
 
-### Homebrew
-
-```bash
-brew tap kirillr-sibirski/lifi
-brew install lifi
-```
-
 ### Build from source
 
 ```bash
-git clone https://github.com/Kirillr-Sibirski/defi-mullet.git
-cd defi-mullet
+git clone https://github.com/Kirillr-Sibirski/lifi-cli.git
+cd lifi-cli
 go build -o bin/lifi ./cmd/lifi
 ./bin/lifi version
 ```
 
+### Homebrew
+
+Homebrew packaging is planned, but the source build is the current install path.
+
 ## Quick start
 
-1. Export your LI.FI API key.
-2. Optionally export a wallet private key for write commands.
-3. Run `lifi doctor`.
-4. Discover a vault with `lifi vaults`.
-5. Inspect the vault with `lifi inspect`.
-6. Generate a quote with `lifi quote`.
-7. Execute a deposit with `lifi deposit`.
-8. Verify the resulting position with `lifi portfolio`.
+1. Copy `.env.example` to `.env`.
+2. Add your LI.FI API key.
+3. Add RPC URLs for the chains you want to use.
+4. Optionally add a wallet private key for write commands.
+5. Run `lifi doctor`.
+6. Discover a vault with `lifi vaults`.
+7. Inspect the vault with `lifi inspect`.
+8. Generate a quote with `lifi quote`.
+9. Execute a deposit with `lifi deposit`.
+10. Verify the resulting position with `lifi portfolio`.
 
 Example:
 
 ```bash
-export LIFI_API_KEY=your_api_key
-export LIFI_WALLET_PRIVATE_KEY=your_private_key
+cp .env.example .env
+# fill in the values you need
 
 lifi doctor
 
@@ -113,8 +112,9 @@ What it validates:
 
 - `earn.li.fi` reachability
 - `li.quest` reachability
+- `.env` presence
 - `LIFI_API_KEY` presence
-- API key usability against LI.FI endpoints
+- config file presence
 - wallet/private key availability for write commands
 - RPC availability for configured chains
 
@@ -346,16 +346,7 @@ Behavior:
 
 Shows the current Earn positions for an address.
 
-Default columns:
-
-- protocol
-- chain
-- vault
-- supplied asset
-- balance
-- value USD
-- APY
-- realized and unrealized metrics when available
+Human mode prints the matching position objects. JSON mode returns the raw positions array.
 
 Flags:
 
@@ -420,6 +411,8 @@ Examples:
 - `LIFI_RPC_BASE`
 - `LIFI_RPC_ARBITRUM`
 - `LIFI_RPC_ETHEREUM`
+
+`.env` files in the project root are loaded automatically, so local development can use a gitignored `.env` while CI and shells can still rely on exported environment variables.
 
 ### Config file
 
@@ -489,6 +482,27 @@ Safety rules:
 - write commands fail fast when RPC or wallet configuration is missing
 - vault warnings surface when a vault is not transactional or when analytics fields are missing
 
+## Current status
+
+Implemented and live-tested:
+
+- `doctor`
+- `chains`
+- `protocols`
+- `tokens`
+- `vaults`
+- `inspect`
+- `recommend`
+- `quote`
+- `allowance`
+- `portfolio`
+- `deposit --dry-run`
+
+Implemented but not live-tested in this repo session because they require a real wallet key:
+
+- `approve`
+- `deposit`
+
 ## Example workflows
 
 ### Discover the best Base USDC vaults
@@ -550,24 +564,23 @@ lifi vaults --chain base --asset USDC --json
 ```text
 cmd/lifi/
 internal/config/
-internal/output/
-internal/doctor/
 internal/earn/
-internal/lifi/
-internal/wallet/
+internal/lifiapi/
 internal/evm/
-internal/quote/
-internal/portfolio/
-internal/status/
+internal/cli/
 ```
 
 ## Packaging
 
-`lifi` ships as:
+`lifi` is currently available as:
 
 - a standalone binary
+- source builds today
+
+Planned next:
+
 - GitHub release artifacts
-- a Homebrew package
+- Homebrew packaging
 - shell completions
 
 The CLI is designed to be scriptable directly and to serve as a backend for future agent wrappers and editor skills.

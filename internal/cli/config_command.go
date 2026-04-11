@@ -88,6 +88,8 @@ func runConfigShow(cfg *config.Config) error {
 	payload := map[string]any{
 		"config_path":         cfg.ResolvedConfigPath,
 		"config_exists":       cfg.ConfigExists(),
+		"dotenv_path":         cfg.DotEnvPath,
+		"dotenv_exists":       cfg.DotEnvExists(),
 		"profile":             cfg.Global.Profile,
 		"default_from_chain":  cfg.DefaultFromChain,
 		"default_slippagebps": cfg.DefaultSlippageBPS,
@@ -103,6 +105,8 @@ func runConfigShow(cfg *config.Config) error {
 
 	fmt.Printf("Config path:          %s\n", cfg.ResolvedConfigPath)
 	fmt.Printf("Config exists:        %t\n", cfg.ConfigExists())
+	fmt.Printf(".env path:            %s\n", cfg.DotEnvPath)
+	fmt.Printf(".env exists:          %t\n", cfg.DotEnvExists())
 	fmt.Printf("Profile:              %s\n", cfg.Global.Profile)
 	fmt.Printf("Default from chain:   %s\n", emptyFallback(cfg.DefaultFromChain))
 	fmt.Printf("Default slippage bps: %s\n", emptyFallback(cfg.DefaultSlippageBPS))
