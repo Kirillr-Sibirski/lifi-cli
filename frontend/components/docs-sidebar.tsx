@@ -6,6 +6,12 @@ type DocsSidebarProps = {
   activeSlug?: string;
 };
 
+const quickExamples = [
+  "lifi doctor --write-checks --chain opt",
+  "lifi vaults --chain opt --asset USDC --transactional-only --limit 5",
+  "lifi deposit --vault 0xVault --from-chain opt --from-token USDC --amount 10 --dry-run",
+];
+
 export function DocsSidebar({ activeSlug }: DocsSidebarProps) {
   const sections = getDocSections();
 
@@ -15,9 +21,18 @@ export function DocsSidebar({ activeSlug }: DocsSidebarProps) {
         <p className="sidebar-kicker">Documentation</p>
         <h2>LI.FI CLI</h2>
         <p>
-          A focused docs surface for the <code>lifi</code> command line tool,
-          built around Earn and Composer flows.
+          Installation, Earn, Composer, config, and operational docs for the{" "}
+          <code>lifi</code> CLI.
         </p>
+      </div>
+
+      <div className="sidebar-examples">
+        <p className="examples-title">Quick examples</p>
+        {quickExamples.map((command) => (
+          <code key={command} className="example-command">
+            {command}
+          </code>
+        ))}
       </div>
 
       <nav className="sidebar-nav" aria-label="Documentation">

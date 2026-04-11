@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import docsConfig from "@/content.config.json";
+import { slugify } from "@/lib/markdown";
 
 export type DocConfig = {
   slug: string;
@@ -81,41 +82,6 @@ export function getNeighborDocs(slug: string): {
   };
 }
 
-export function rewriteMarkdownHref(currentSource: string, href?: string): string | undefined {
-  if (!href) {
-    return href;
-  }
-
-  if (
-    href.startsWith("http://") ||
-    href.startsWith("https://") ||
-    href.startsWith("mailto:") ||
-    href.startsWith("#")
-  ) {
-    return href;
-  }
-
-  const [target, hash] = href.split("#");
-  if (!target.endsWith(".md")) {
-    return href;
-  }
-
-  const resolved = path.posix.normalize(
-    path.posix.join(path.posix.dirname(currentSource), target),
-  );
-
-  const matched = docs.find(
-    (doc) => path.posix.normalize(doc.source.replace(/^\.\.\//, "")) === resolved.replace(/^\.\.\//, ""),
-  );
-
-  const suffix = hash ? `#${slugify(hash)}` : "";
-  if (matched) {
-    return `/docs/${matched.slug}${suffix}`;
-  }
-
-  return `${REPO_URL}/blob/main/${resolved}${hash ? `#${hash}` : ""}`;
-}
-
 function extractHeadings(markdown: string): DocHeading[] {
   const headings: DocHeading[] = [];
   const pattern = /^(#{1,3})\s+(.+)$/gm;
@@ -140,13 +106,4 @@ function cleanHeading(value: string): string {
     .replace(/`/g, "")
     .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
     .trim();
-}
-
-export function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[`*_~]/g, "")
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-");
 }

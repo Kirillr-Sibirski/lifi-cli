@@ -1,10 +1,12 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { Children, isValidElement, type ReactNode, useState } from "react";
 
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { rewriteMarkdownHref, slugify } from "@/lib/content";
+import { rewriteMarkdownHref, slugify } from "@/lib/markdown";
 
 type MarkdownRendererProps = {
   content: string;
@@ -64,6 +66,7 @@ export function MarkdownRenderer({ content, source }: MarkdownRendererProps) {
 
             return <Link href={resolved}>{children}</Link>;
           },
+          pre: ({ children }) => <CopyablePre>{children}</CopyablePre>,
           code: ({ className, children }) => {
             const value = String(children).replace(/\n$/, "");
             const isBlock = Boolean(className);
@@ -77,6 +80,40 @@ export function MarkdownRenderer({ content, source }: MarkdownRendererProps) {
       >
         {content}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+function CopyablePre({ children }: { children: ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const child = Children.only(children);
+
+  if (!isValidElement<{ className?: string; children?: ReactNode }>(child)) {
+    return <pre>{children}</pre>;
+  }
+
+  const className = child.props.className ?? "";
+  const language = className.replace("language-", "").trim() || "bash";
+  const value = flattenText(child.props.children ?? "");
+
+  async function onCopy() {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <div className="code-block">
+      <div className="code-block-toolbar">
+        <span className="code-language">{language}</span>
+        <div className="copy-feedback">
+          {copied ? "Copied" : ""}
+          <button type="button" className="copy-button" onClick={onCopy}>
+            Copy
+          </button>
+        </div>
+      </div>
+      <pre>{child}</pre>
     </div>
   );
 }

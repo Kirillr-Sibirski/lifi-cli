@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DocsSidebar } from "@/components/docs-sidebar";
-import { DocsTableOfContents } from "@/components/docs-table-of-contents";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { getDocBySlugSync, getDocPage, getDocs, getNeighborDocs } from "@/lib/content";
 
@@ -73,8 +72,6 @@ export default async function DocPage({ params }: DocPageProps) {
           ) : null}
         </div>
       </article>
-
-      <DocsTableOfContents headings={doc.headings} />
     </main>
   );
 }
