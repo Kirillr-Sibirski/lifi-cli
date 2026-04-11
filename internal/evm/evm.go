@@ -29,6 +29,15 @@ type Wallet struct {
 	Address    common.Address
 }
 
+type FeeEstimate struct {
+	GasLimit      uint64
+	GasPrice      *big.Int
+	GasTipCap     *big.Int
+	GasFeeCap     *big.Int
+	EstimatedCost *big.Int
+	Dynamic       bool
+}
+
 func WalletFromHex(privateKeyHex string) (*Wallet, error) {
 	privateKeyHex = strings.TrimPrefix(strings.TrimSpace(privateKeyHex), "0x")
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
