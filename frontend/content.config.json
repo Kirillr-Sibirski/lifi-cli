@@ -1,0 +1,74 @@
+{
+  "docs": [
+    {
+      "slug": "getting-started",
+      "title": "Getting Started",
+      "description": "Install lifi, wire your wallet and RPCs, and run the first Earn + Composer flow.",
+      "section": "Start Here",
+      "source": "../README.md"
+    },
+    {
+      "slug": "earn",
+      "title": "Earn",
+      "description": "Vault discovery, inspection, recommendations, portfolio reads, and deposit execution.",
+      "section": "Core Guides",
+      "source": "../docs/earn.md"
+    },
+    {
+      "slug": "composer",
+      "title": "Composer",
+      "description": "Composer quote generation, approvals, allowance checks, and status tracking.",
+      "section": "Core Guides",
+      "source": "../docs/composer.md"
+    },
+    {
+      "slug": "configuration",
+      "title": "Configuration",
+      "description": "Environment variables, profiles, RPC conventions, and config precedence.",
+      "section": "Reference",
+      "source": "../docs/configuration.md"
+    },
+    {
+      "slug": "automation",
+      "title": "Automation",
+      "description": "Machine-readable JSON flows for scripts, agents, and CI.",
+      "section": "Reference",
+      "source": "../docs/automation.md"
+    },
+    {
+      "slug": "supported-chains",
+      "title": "Supported Chains",
+      "description": "Practical expectations for chain support and the best-tested live routes.",
+      "section": "Reference",
+      "source": "../docs/supported-chains.md"
+    },
+    {
+      "slug": "security",
+      "title": "Security",
+      "description": "Operational guardrails for wallets, approvals, and local secrets.",
+      "section": "Operations",
+      "source": "../docs/security.md"
+    },
+    {
+      "slug": "operations",
+      "title": "Operations",
+      "description": "Release checklist, smoke tests, and support runbooks for the CLI.",
+      "section": "Operations",
+      "source": "../docs/operations.md"
+    },
+    {
+      "slug": "release",
+      "title": "Release",
+      "description": "GitHub Releases, Homebrew packaging, and stable install verification.",
+      "section": "Operations",
+      "source": "../docs/release.md"
+    },
+    {
+      "slug": "changelog",
+      "title": "Changelog",
+      "description": "Release notes and product changes across public versions.",
+      "section": "Operations",
+      "source": "../CHANGELOG.md"
+    }
+  ]
+}
