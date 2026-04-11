@@ -28,5 +28,11 @@ goreleaser release --snapshot --clean
 
 ```bash
 brew tap Kirillr-Sibirski/lifi-cli https://github.com/Kirillr-Sibirski/lifi-cli
-brew install --HEAD lifi
+brew install lifi
+```
+
+For a `main` build:
+
+```bash
+brew install --HEAD Kirillr-Sibirski/lifi-cli/lifi
 ```

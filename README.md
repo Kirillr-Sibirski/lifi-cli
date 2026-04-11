@@ -17,16 +17,20 @@ go build -o bin/lifi ./cmd/lifi
 
 ### Homebrew
 
-The `lifi-cli` repository acts as the Homebrew tap. Install the latest `main`
-build with:
+The `lifi-cli` repository acts as the Homebrew tap.
 
 ```bash
 brew tap Kirillr-Sibirski/lifi-cli https://github.com/Kirillr-Sibirski/lifi-cli
-brew install --HEAD lifi
+brew install lifi
 ```
 
-Stable Homebrew installs are cut from tagged releases and documented in
-[docs/release.md](docs/release.md).
+To install the latest `main` build instead of the tagged release:
+
+```bash
+brew install --HEAD Kirillr-Sibirski/lifi-cli/lifi
+```
+
+Release details are documented in [docs/release.md](docs/release.md).
 
 ## Quick start
 
