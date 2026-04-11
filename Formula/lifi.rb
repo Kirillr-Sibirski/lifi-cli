@@ -2,8 +2,8 @@ class Lifi < Formula
   desc "CLI for LI.FI Earn and Composer"
   homepage "https://github.com/Kirillr-Sibirski/lifi-cli"
   license "MIT"
-  url "https://github.com/Kirillr-Sibirski/lifi-cli/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "7111cc4021e5d1af9b85854d0c74e948ae81641a1cadb04c76adc691e81f37f9"
+  url "https://github.com/Kirillr-Sibirski/lifi-cli/archive/refs/tags/v0.1.1.tar.gz"
+  sha256 "5e5c97bef32294eb55691fb50a8761b0d28bce9078f8ab94a9220ae3937fecfe"
   head "https://github.com/Kirillr-Sibirski/lifi-cli.git", branch: "main"
 
   depends_on "go" => :build
