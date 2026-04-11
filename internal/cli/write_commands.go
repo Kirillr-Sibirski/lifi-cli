@@ -10,11 +10,13 @@ import (
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/evm"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/flow"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
 
 type allowanceCommand struct{}
 type approveCommand struct{}
 type depositCommand struct{}
+type withdrawCommand struct{}
 
 func newAllowanceCommand() Command { return allowanceCommand{} }
 
@@ -445,6 +447,238 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	if cfg.Global.JSON {
 		return writeJSON(result)
 	}
+	return nil
+}
+
+func newWithdrawCommand() Command { return withdrawCommand{} }
+
+func (withdrawCommand) Name() string { return "withdraw" }
+
+func (withdrawCommand) Summary() string { return "Redeem vault shares back to the underlying token" }
+
+func (withdrawCommand) Usage() string {
+	return "lifi withdraw --vault <address> --chain <chain> --amount <shares> [--to-token <symbol-or-address>] [--dry-run] [--yes] [options]"
+}
+
+func (withdrawCommand) Run(cfg *config.Config, args []string) error {
+	fs := newFlagSet("withdraw")
+	var vaultArg, chainArg, toTokenArg, amount, amountWei, fromAddress string
+	var slippageBps, gasPolicy string
+	var yes, dryRun bool
+	fs.StringVar(&vaultArg, "vault", "", "Vault address to redeem from")
+	fs.StringVar(&chainArg, "chain", "", "Chain the vault lives on")
+	fs.StringVar(&toTokenArg, "to-token", "", "Output token (default: vault's underlying token)")
+	fs.StringVar(&amount, "amount", "", "Shares to redeem (human-readable)")
+	fs.StringVar(&amountWei, "amount-wei", "", "Shares to redeem (raw base units)")
+	fs.StringVar(&fromAddress, "from-address", "", "Wallet address (overrides config)")
+	fs.StringVar(&slippageBps, "slippage-bps", "", "Slippage in basis points")
+	fs.StringVar(&gasPolicy, "gas-policy", "auto", "Gas pricing policy: auto, quote, or rpc")
+	fs.BoolVar(&dryRun, "dry-run", false, "Simulate only — never broadcast")
+	fs.BoolVar(&yes, "yes", false, "Skip confirmation prompt")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(vaultArg) == "" {
+		return fmt.Errorf("--vault is required\n\nUsage: %s\nExample: lifi withdraw --vault 0xVaultAddress --chain opt --amount 0.049", (withdrawCommand{}).Usage())
+	}
+	if amount == "" && amountWei == "" {
+		return fmt.Errorf("--amount or --amount-wei is required\n\nRun `lifi portfolio <address>` to see your share balances")
+	}
+
+	rt := newRuntime(cfg)
+	ctx, cancel := rt.context()
+	defer cancel()
+
+	vault, err := rt.resolveVault(ctx, vaultArg)
+	if err != nil {
+		return err
+	}
+	if !vault.IsRedeemable {
+		return fmt.Errorf("vault %q does not support withdrawals (isRedeemable=false)", vault.Name)
+	}
+
+	chain, err := rt.resolveChain(ctx, firstNonEmpty(chainArg, fmt.Sprintf("%d", vault.ChainID)))
+	if err != nil {
+		return err
+	}
+
+	// Determine output token: explicit flag > vault's first underlying token.
+	var toTokenAddress string
+	if strings.TrimSpace(toTokenArg) != "" {
+		tok, err := rt.resolveToken(ctx, chain, toTokenArg)
+		if err != nil {
+			return err
+		}
+		toTokenAddress = tok.Address
+	} else if len(vault.UnderlyingTokens) > 0 {
+		toTokenAddress = vault.UnderlyingTokens[0].Address
+	} else {
+		return fmt.Errorf("could not determine output token; pass --to-token explicitly")
+	}
+
+	walletAddr, err := rt.walletAddress(fromAddress)
+	if err != nil {
+		return err
+	}
+
+	// Resolve the actual decimals of the vault share token (the vault address is
+	// itself the ERC-20 share token). ERC-4626 vaults use 18 by default, but we
+	// look it up from the LI.FI token list to be precise.
+	shareDecimals := 18
+	if len(vault.LPTokens) > 0 {
+		shareDecimals = vault.LPTokens[0].Decimals
+	} else {
+		// Try to resolve the vault address as a token on the chain.
+		if shareTok, err := rt.resolveToken(ctx, chain, vault.Address); err == nil {
+			shareDecimals = shareTok.Decimals
+		}
+	}
+
+	fromAmount := strings.TrimSpace(amountWei)
+	if fromAmount == "" {
+		parsed, err := parseAmountToBaseUnits(amount, shareDecimals)
+		if err != nil {
+			return err
+		}
+		fromAmount = parsed.String()
+	}
+
+	slippage := basisPointsToSlippage(firstNonEmpty(slippageBps, cfg.DefaultSlippageBPS))
+	quote, err := rt.lifiClient.GetQuote(ctx, lifiapi.QuoteRequest{
+		FromChain:   chain.ID,
+		ToChain:     chain.ID,
+		FromToken:   vault.Address,
+		ToToken:     toTokenAddress,
+		FromAddress: walletAddr,
+		ToAddress:   walletAddr,
+		FromAmount:  fromAmount,
+		Slippage:    slippage,
+	})
+	if err != nil {
+		return err
+	}
+
+	rpcURL, err := rt.rpcURL(chain)
+	if err != nil {
+		return err
+	}
+	client, err := evm.DialRPC(ctx, rpcURL)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// Preflight: share balance check.
+	shareBalance, err := evm.Balance(ctx, client, vault.Address, commonAddress(walletAddr))
+	if err != nil {
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
+	}
+	required := new(big.Int)
+	required.SetString(fromAmount, 10)
+	if shareBalance.Cmp(required) < 0 {
+		return apperror.Formatf("execution", apperror.ExitExecution,
+			"insufficient share balance: have %s shares, need %s",
+			formatAmount(shareBalance.String(), shareDecimals, 6),
+			formatAmount(fromAmount, shareDecimals, 6),
+		)
+	}
+
+	nativeBalance, err := evm.Balance(ctx, client, "", commonAddress(walletAddr))
+	if err != nil {
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
+	}
+
+	executor := flow.NewRPCExecutor(client)
+	quoteFee, err := executor.EstimateQuoteFee(ctx, quote.TransactionRequest, gasPolicy)
+	if err != nil {
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
+	}
+
+	// Check approval for vault share token → spender.
+	approvalNeeded := false
+	approvalAddress := quote.Estimate.ApprovalAddress
+	if approvalAddress != "" {
+		allowance, err := evm.Allowance(ctx, client, vault.Address, commonAddress(walletAddr), commonAddress(approvalAddress))
+		if err != nil {
+			return apperror.Wrap("rpc", apperror.ExitRPC, err)
+		}
+		approvalNeeded = allowance.Cmp(required) < 0
+	}
+
+	outDecimals := shareDecimals
+	if len(vault.UnderlyingTokens) > 0 {
+		outDecimals = vault.UnderlyingTokens[0].Decimals
+	}
+
+	printSectionHeader("Withdrawal Plan", cfg.Global.NoColor)
+	printTable([]string{"field", "value"}, [][]string{
+		{"wallet", walletAddr},
+		{"chain", fmt.Sprintf("%s (%d)", chain.Name, chain.ID)},
+		{"vault", vault.Address},
+		{"shares to redeem", formatAmount(fromAmount, shareDecimals, 6)},
+		{"share balance", formatAmount(shareBalance.String(), shareDecimals, 6)},
+		{"expected received", formatAmount(quote.Estimate.ToAmount, outDecimals, 6)},
+		{"approval needed", boolText(approvalNeeded)},
+		{"native balance", formatAmount(nativeBalance.String(), chain.NativeToken.Decimals, 6)},
+		{"estimated gas cost", formatAmount(quoteFee.EstimatedCost.String(), chain.NativeToken.Decimals, 6)},
+		{"gas policy", gasPolicy},
+	})
+
+	if dryRun {
+		return nil
+	}
+
+	wallet, err := rt.wallet()
+	if err != nil {
+		return apperror.Wrap("config", apperror.ExitConfig, err)
+	}
+
+	if !yes {
+		confirmed, err := promptConfirm("Broadcast withdrawal transaction?")
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return nil
+		}
+	}
+
+	if approvalNeeded {
+		hash, err := executor.Approve(ctx, wallet, chain.ID, vault.Address, commonAddress(approvalAddress), required, gasPolicy)
+		if err != nil {
+			return apperror.Wrap("execution", apperror.ExitExecution, err)
+		}
+		if _, err := executor.WaitForReceipt(ctx, hash, 3*time.Second); err != nil {
+			return apperror.Wrap("rpc", apperror.ExitRPC, err)
+		}
+	}
+
+	hash, err := executor.SendQuote(ctx, wallet, quote.TransactionRequest, gasPolicy)
+	if err != nil {
+		return apperror.Wrap("execution", apperror.ExitExecution, err)
+	}
+
+	receipt, err := executor.WaitForReceipt(ctx, hash, 3*time.Second)
+	if err != nil {
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
+	}
+
+	if cfg.Global.JSON {
+		return writeJSON(map[string]any{
+			"stage":          "confirmed",
+			"status":         "ok",
+			"tx_hash":        hash.Hex(),
+			"receipt_status": receipt.Status,
+			"explorer_url":   explorerTxURL(chain, hash.Hex()),
+		})
+	}
+
+	fmt.Printf("withdrawal transaction sent: %s\n", hash.Hex())
+	if url := explorerTxURL(chain, hash.Hex()); url != "" {
+		fmt.Printf("explorer: %s\n", url)
+	}
+	fmt.Printf("receipt status: %d\n", receipt.Status)
 	return nil
 }
 

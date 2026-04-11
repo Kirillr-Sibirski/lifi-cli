@@ -155,6 +155,44 @@ lifi deposit \
 | `--yes` | | Skip confirmation prompt |
 | `--skip-simulate` | | Bypass RPC simulation |
 
+### Withdraw
+
+Redeem vault shares back to the underlying token:
+
+```bash
+# Preview only
+lifi withdraw \
+  --vault 0xVaultAddress \
+  --chain opt \
+  --amount 0.049 \
+  --dry-run
+
+# Broadcast
+lifi withdraw \
+  --vault 0xVaultAddress \
+  --chain opt \
+  --amount 0.049 \
+  --yes
+```
+
+The `--amount` is in **vault shares** (check your balance with `lifi portfolio <address>`). The command handles the ERC-20 approval of the share token automatically.
+
+**Required:** `LIFI_WALLET_PRIVATE_KEY` and `LIFI_RPC_<CHAIN>`
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--vault` | required | Vault address to redeem from |
+| `--chain` | vault's chain | Chain the vault lives on |
+| `--amount` | required | Shares to redeem (human-readable) |
+| `--amount-wei` | | Shares in raw base units |
+| `--to-token` | vault's underlying | Output token |
+| `--slippage-bps` | `50` | Slippage tolerance |
+| `--gas-policy` | `auto` | `auto`, `quote`, or `rpc` |
+| `--dry-run` | | Simulate only, never broadcasts |
+| `--yes` | | Skip confirmation prompt |
+
 ---
 
 ## Composer
@@ -357,11 +395,10 @@ The portfolio index may take a moment to update. Retry with `lifi portfolio 0xYo
 
 ## Roadmap
 
-`lifi-cli` is at v0.1 — the core read and deposit flows are solid. Here's what comes next.
+`lifi-cli` is at v0.1 — the core read, deposit, and withdraw flows are solid. Here's what comes next.
 
 ### Near-term
 
-- **`lifi withdraw`** — redeem vault positions from the CLI, symmetrical to `deposit`
 - **`lifi watch`** — live-polling mode for `portfolio` and `status`, streaming updates to the terminal
 - **`lifi sweep`** — consolidate multiple small positions into one vault in a single command
 - **Ledger / hardware wallet support** — sign transactions via USB without exposing a raw private key

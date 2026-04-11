@@ -4,6 +4,15 @@ All notable changes to `lifi` are documented here.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-11
+
+- Added `lifi withdraw` command: redeem vault shares back to the underlying
+  token using the LI.FI Composer API. Supports `--dry-run`, `--yes`,
+  `--to-token`, `--slippage-bps`, and `--gas-policy`. Handles ERC-20 approval
+  of the vault share token automatically.
+- Resolves vault share token decimals from the LI.FI token list (vault tokens
+  are typically 18-decimal ERC-4626 shares, not the same as the underlying).
+
 ## [0.1.5] - 2026-04-11
 
 - Replaced the ASCII logo with a DOS Rebel block-font banner (`li.fi cli`).

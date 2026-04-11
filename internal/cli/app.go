@@ -10,7 +10,7 @@ import (
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
 )
 
-var version = "0.1.5"
+var version = "0.1.6"
 
 type Command interface {
 	Name() string
@@ -124,6 +124,7 @@ func builtInCommands() map[string]Command {
 		newAllowanceCommand(),
 		newApproveCommand(),
 		newDepositCommand(),
+		newWithdrawCommand(),
 		newPortfolioCommand(),
 		newStatusCommand(),
 		newConfigCommand(),
