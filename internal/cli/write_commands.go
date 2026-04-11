@@ -1,16 +1,15 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/apperror"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
-	"github.com/Kirillr-Sibirski/lifi-cli/internal/earn"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/evm"
-	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/flow"
 )
 
 type allowanceCommand struct{}
@@ -142,17 +141,18 @@ func (approveCommand) Name() string { return "approve" }
 func (approveCommand) Summary() string { return "Send an ERC-20 approval transaction" }
 
 func (approveCommand) Usage() string {
-	return "lifi approve --chain <chain> --token <symbol-or-address> --spender <address> --amount <human|max> [--yes] [--json]"
+	return "lifi approve --chain <chain> --token <symbol-or-address> --spender <address> --amount <human|max> [--gas-policy auto|rpc] [--yes] [--json]"
 }
 
 func (approveCommand) Run(cfg *config.Config, args []string) error {
 	fs := newFlagSet("approve")
-	var chainArg, tokenArg, spender, amount string
+	var chainArg, tokenArg, spender, amount, gasPolicy string
 	var yes bool
 	fs.StringVar(&chainArg, "chain", "", "Chain name or ID")
 	fs.StringVar(&tokenArg, "token", "", "Token symbol or address")
 	fs.StringVar(&spender, "spender", "", "Spender address")
 	fs.StringVar(&amount, "amount", "", "Approval amount or max")
+	fs.StringVar(&gasPolicy, "gas-policy", "auto", "Gas pricing policy: auto or rpc")
 	fs.BoolVar(&yes, "yes", false, "Skip confirmation prompt")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -179,15 +179,15 @@ func (approveCommand) Run(cfg *config.Config, args []string) error {
 
 	wallet, err := rt.wallet()
 	if err != nil {
-		return err
+		return apperror.Wrap("config", apperror.ExitConfig, err)
 	}
 	rpcURL, err := rt.rpcURL(chain)
 	if err != nil {
-		return err
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
 	}
 	client, err := evm.DialRPC(ctx, rpcURL)
 	if err != nil {
-		return err
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
 	}
 	defer client.Close()
 
@@ -209,20 +209,24 @@ func (approveCommand) Run(cfg *config.Config, args []string) error {
 		}
 	}
 
-	hash, err := evm.Approve(ctx, client, wallet, big.NewInt(int64(chain.ID)), token.Address, commonAddress(spender), approvalAmount)
+	hash, err := evm.Approve(ctx, client, wallet, chain.ID, token.Address, commonAddress(spender), approvalAmount, gasPolicy)
 	if err != nil {
-		return err
+		return apperror.Wrap("execution", apperror.ExitExecution, err)
 	}
 	receipt, err := evm.WaitForReceipt(ctx, client, hash, 3*time.Second)
 	if err != nil {
-		return err
+		return apperror.Wrap("rpc", apperror.ExitRPC, err)
 	}
 
 	payload := map[string]any{
-		"tx_hash": hash.Hex(),
-		"status":  receipt.Status,
-		"spender": spender,
-		"amount":  approvalAmount.String(),
+		"stage":        "approval",
+		"status":       "ok",
+		"message":      "approval transaction confirmed",
+		"tx_hash":      hash.Hex(),
+		"receipt_code": receipt.Status,
+		"spender":      spender,
+		"amount":       approvalAmount.String(),
+		"explorer_url": explorerTxURL(chain, hash.Hex()),
 	}
 	if cfg.Global.JSON {
 		return writeJSON(payload)
@@ -230,9 +234,11 @@ func (approveCommand) Run(cfg *config.Config, args []string) error {
 
 	printTable([]string{"field", "value"}, [][]string{
 		{"tx hash", hash.Hex()},
+		{"explorer", emptyFallback(explorerTxURL(chain, hash.Hex()))},
 		{"status", fmt.Sprintf("%d", receipt.Status)},
 		{"spender", spender},
 		{"amount", formatAmount(approvalAmount.String(), token.Decimals, 6)},
+		{"gas policy", gasPolicy},
 	})
 	return nil
 }
@@ -250,8 +256,8 @@ func (depositCommand) Usage() string {
 func (depositCommand) Run(cfg *config.Config, args []string) error {
 	fs := newFlagSet("deposit")
 	var vaultArg, fromChainArg, toChainArg, fromTokenArg, amount, fromAddress, toAddress string
-	var slippageBps, approveMode string
-	var wait, verifyPosition, yes, dryRun bool
+	var slippageBps, approveMode, approvalAmountMode, gasPolicy, waitTimeoutArg, portfolioTimeoutArg string
+	var wait, verifyPosition, yes, dryRun, simulate, skipSimulate bool
 	fs.StringVar(&vaultArg, "vault", "", "Target vault address")
 	fs.StringVar(&fromChainArg, "from-chain", "", "Source chain")
 	fs.StringVar(&toChainArg, "to-chain", "", "Destination chain")
@@ -261,12 +267,35 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	fs.StringVar(&toAddress, "to-address", "", "Destination wallet address")
 	fs.StringVar(&slippageBps, "slippage-bps", "", "Allowed slippage in basis points")
 	fs.StringVar(&approveMode, "approve", "auto", "Approval mode: auto, always, or never")
+	fs.StringVar(&approvalAmountMode, "approval-amount", "exact", "Approval amount: exact or infinite")
+	fs.StringVar(&gasPolicy, "gas-policy", "auto", "Gas pricing policy: auto, quote, or rpc")
+	fs.StringVar(&waitTimeoutArg, "wait-timeout", "5m", "Maximum time to wait for transaction confirmation")
+	fs.StringVar(&portfolioTimeoutArg, "portfolio-timeout", "1m", "Maximum time to wait for portfolio verification")
 	fs.BoolVar(&wait, "wait", false, "Wait for confirmation")
 	fs.BoolVar(&verifyPosition, "verify-position", false, "Verify portfolio position after execution")
 	fs.BoolVar(&yes, "yes", false, "Skip confirmation prompt")
 	fs.BoolVar(&dryRun, "dry-run", false, "Only prepare the quote and checks")
+	fs.BoolVar(&simulate, "simulate", true, "Run RPC simulation before broadcast")
+	fs.BoolVar(&skipSimulate, "skip-simulate", false, "Skip transaction simulation")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if skipSimulate {
+		simulate = false
+	}
+	if approvalAmountMode != "exact" && approvalAmountMode != "infinite" {
+		return apperror.New("input", apperror.ExitInput, "--approval-amount must be exact or infinite")
+	}
+	if gasPolicy != "auto" && gasPolicy != "quote" && gasPolicy != "rpc" {
+		return apperror.New("input", apperror.ExitInput, "--gas-policy must be one of auto, quote, or rpc")
+	}
+	waitTimeout, err := time.ParseDuration(waitTimeoutArg)
+	if err != nil {
+		return apperror.Wrap("input", apperror.ExitInput, err)
+	}
+	portfolioTimeout, err := time.ParseDuration(portfolioTimeoutArg)
+	if err != nil {
+		return apperror.Wrap("input", apperror.ExitInput, err)
 	}
 
 	quote, fromChain, fromToken, walletAddress, err := prepareQuote(cfg, quoteInputs{
@@ -286,15 +315,9 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	rt := newRuntime(cfg)
 	ctx, cancel := rt.context()
 	defer cancel()
-
-	var baselinePositions []map[string]any
-	if verifyPosition {
-		verifyCtx, verifyCancel := context.WithTimeout(context.Background(), 20*time.Second)
-		portfolio, err := rt.earnClient.GetPortfolio(verifyCtx, walletAddress)
-		verifyCancel()
-		if err == nil {
-			baselinePositions = portfolio.Positions
-		}
+	vault, err := rt.resolveVault(ctx, vaultArg)
+	if err != nil {
+		return err
 	}
 
 	rpcURL, err := rt.rpcURL(fromChain)
@@ -306,61 +329,42 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 		return err
 	}
 	defer client.Close()
+	executor := flow.NewRPCExecutor(client)
+	expectedDelta := parseFloat(formatAmount(quote.Estimate.ToAmount, quote.Action.ToToken.Decimals, 9))
 
-	balance, err := evm.Balance(ctx, client, fromToken.Address, commonAddress(walletAddress))
+	preflightResult, err := flow.ExecuteDeposit(ctx, flow.DepositRequest{
+		Quote:              quote,
+		Vault:              vault,
+		FromChain:          fromChain,
+		FromToken:          fromToken,
+		WalletAddress:      walletAddress,
+		Executor:           executor,
+		PortfolioClient:    rt.earnClient,
+		StatusClient:       rt.lifiClient,
+		DryRun:             true,
+		Simulate:           simulate,
+		Wait:               wait,
+		VerifyPosition:     verifyPosition,
+		ApproveMode:        approveMode,
+		ApprovalAmountMode: approvalAmountMode,
+		GasPolicy:          gasPolicy,
+		WaitTimeout:        waitTimeout,
+		PortfolioTimeout:   portfolioTimeout,
+		VerificationDelta:  expectedDelta,
+	})
 	if err != nil {
 		return err
 	}
-	required := new(big.Int)
-	required.SetString(quote.Action.FromAmount, 10)
-	if balance.Cmp(required) < 0 {
-		return fmt.Errorf(
-			"insufficient balance: have %s %s, need %s %s",
-			formatAmount(balance.String(), fromToken.Decimals, 6), fromToken.Symbol,
-			formatAmount(required.String(), fromToken.Decimals, 6), fromToken.Symbol,
-		)
-	}
-
-	approvalNeeded := !evm.IsNativeToken(fromToken.Address)
-	if approvalNeeded {
-		allowance, err := evm.Allowance(ctx, client, fromToken.Address, commonAddress(walletAddress), commonAddress(quote.Estimate.ApprovalAddress))
-		if err != nil {
-			return err
-		}
-		approvalNeeded = allowance.Cmp(required) < 0
-	}
-
-	mode := strings.ToLower(strings.TrimSpace(approveMode))
-	switch mode {
-	case "auto", "always", "never":
-	default:
-		return fmt.Errorf("--approve must be one of auto, always, or never")
-	}
-	if mode == "always" && !evm.IsNativeToken(fromToken.Address) {
-		approvalNeeded = true
-	}
-	if mode == "never" && approvalNeeded && !dryRun {
-		return fmt.Errorf("approval is required but --approve=never was set")
-	}
-
 	result := map[string]any{
-		"quote":             quote,
-		"wallet":            walletAddress,
-		"balance":           balance.String(),
-		"balance_formatted": formatAmount(balance.String(), fromToken.Decimals, 6),
-		"approval_needed":   approvalNeeded,
-		"dry_run":           dryRun,
+		"stage":     preflightResult.Stage,
+		"status":    preflightResult.Status,
+		"message":   preflightResult.Message,
+		"quote":     quote,
+		"preflight": preflightResult.Preflight,
 	}
 
 	if !cfg.Global.JSON {
-		printTable([]string{"field", "value"}, quoteSummaryRows(quote))
-		fmt.Println()
-		printTable([]string{"field", "value"}, [][]string{
-			{"wallet", walletAddress},
-			{"balance", formatAmount(balance.String(), fromToken.Decimals, 6)},
-			{"approval needed", boolText(approvalNeeded)},
-			{"dry run", boolText(dryRun)},
-		})
+		printDepositSummary(preflightResult.Preflight)
 	}
 	if dryRun {
 		if cfg.Global.JSON {
@@ -371,7 +375,7 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 
 	wallet, err := rt.wallet()
 	if err != nil {
-		return err
+		return apperror.Wrap("config", apperror.ExitConfig, err)
 	}
 
 	if !yes {
@@ -384,78 +388,54 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 		}
 	}
 
-	if approvalNeeded && strings.ToLower(strings.TrimSpace(approveMode)) != "never" {
-		hash, err := evm.Approve(ctx, client, wallet, big.NewInt(int64(fromChain.ID)), fromToken.Address, commonAddress(quote.Estimate.ApprovalAddress), required)
-		if err != nil {
-			return err
-		}
-		result["approval_tx_hash"] = hash.Hex()
-		waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		receipt, err := evm.WaitForReceipt(waitCtx, client, hash, 3*time.Second)
-		waitCancel()
-		if err != nil {
-			return err
-		}
-		result["approval_receipt_status"] = receipt.Status
-	}
-
-	hash, err := evm.SendQuoteTransaction(ctx, client, wallet, quote.TransactionRequest)
+	finalResult, err := flow.ExecuteDeposit(ctx, flow.DepositRequest{
+		Quote:              quote,
+		Vault:              vault,
+		FromChain:          fromChain,
+		FromToken:          fromToken,
+		WalletAddress:      walletAddress,
+		Wallet:             wallet,
+		Executor:           executor,
+		PortfolioClient:    rt.earnClient,
+		StatusClient:       rt.lifiClient,
+		DryRun:             false,
+		Simulate:           simulate,
+		Wait:               wait,
+		VerifyPosition:     verifyPosition,
+		ApproveMode:        approveMode,
+		ApprovalAmountMode: approvalAmountMode,
+		GasPolicy:          gasPolicy,
+		WaitTimeout:        waitTimeout,
+		PortfolioTimeout:   portfolioTimeout,
+		VerificationDelta:  expectedDelta,
+	})
 	if err != nil {
 		return err
 	}
-	result["tx_hash"] = hash.Hex()
+	result["stage"] = finalResult.Stage
+	result["status"] = finalResult.Status
+	result["message"] = finalResult.Message
+	result["tx_hash"] = finalResult.TxHash
+	result["approval_tx_hash"] = finalResult.ApprovalTxHash
+	result["receipt_status"] = finalResult.ReceiptStatus
+	result["approval_receipt_status"] = finalResult.ApprovalReceiptStatus
+	result["position_detected"] = finalResult.PositionDetected
+	result["positions"] = finalResult.Positions
+	result["status_payload"] = finalResult.StatusPayload
+	result["explorer_url"] = explorerTxURL(fromChain, finalResult.TxHash)
 	if !cfg.Global.JSON {
-		fmt.Printf("deposit transaction sent: %s\n", hash.Hex())
-	}
-	if !wait && !verifyPosition {
-		if cfg.Global.JSON {
-			return writeJSON(result)
+		fmt.Printf("deposit transaction sent: %s\n", finalResult.TxHash)
+		if url := explorerTxURL(fromChain, finalResult.TxHash); url != "" {
+			fmt.Printf("explorer: %s\n", url)
 		}
-		return nil
-	}
-
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	receipt, err := evm.WaitForReceipt(waitCtx, client, hash, 3*time.Second)
-	waitCancel()
-	if err != nil {
-		return err
-	}
-	result["receipt_status"] = receipt.Status
-	if !cfg.Global.JSON {
-		fmt.Printf("source receipt status: %d\n", receipt.Status)
-	}
-
-	if quote.Action.FromChainID != quote.Action.ToChainID {
-		statusPayload, err := waitForExecutionStatus(rt, lifiapi.StatusRequest{
-			TxHash:    hash.Hex(),
-			Bridge:    quote.Tool,
-			FromChain: quote.Action.FromChainID,
-			ToChain:   quote.Action.ToChainID,
-		}, 8*time.Second, 5*time.Minute)
-		if err == nil {
-			result["status"] = statusPayload
-			if !cfg.Global.JSON {
-				fmt.Println("cross-chain status")
-				blob, _ := prettyJSON(statusPayload)
-				fmt.Println(blob)
-			}
+		if finalResult.ApprovalTxHash != "" {
+			fmt.Printf("approval tx: %s\n", finalResult.ApprovalTxHash)
 		}
-	}
-
-	if verifyPosition {
-		vault, err := rt.resolveVault(ctx, vaultArg)
-		if err != nil {
-			return err
+		if wait || verifyPosition {
+			fmt.Printf("source receipt status: %d\n", finalResult.ReceiptStatus)
 		}
-		expectedDelta := parseFloat(formatAmount(quote.Estimate.ToAmount, quote.Action.ToToken.Decimals, 9))
-		found, positions, err := waitForPortfolioPosition(rt, walletAddress, vault, baselinePositions, expectedDelta, 5*time.Second, time.Minute)
-		if err != nil {
-			return err
-		}
-		result["position_detected"] = found
-		result["positions"] = positions
-		if !cfg.Global.JSON {
-			fmt.Printf("position detected: %s\n", boolText(found))
+		if verifyPosition {
+			fmt.Printf("position detected: %s\n", boolText(finalResult.PositionDetected))
 		}
 	}
 	if cfg.Global.JSON {
@@ -464,87 +444,23 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	return nil
 }
 
-func waitForExecutionStatus(rt *runtime, request lifiapi.StatusRequest, interval, timeout time.Duration) (map[string]any, error) {
-	if interval <= 0 {
-		interval = 5 * time.Second
+func printDepositSummary(preflight *flow.Preflight) {
+	if preflight == nil {
+		return
 	}
-	if timeout <= 0 {
-		timeout = 2 * time.Minute
-	}
-
-	deadline := time.Now().Add(timeout)
-	var last map[string]any
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		payload, err := rt.lifiClient.GetStatus(ctx, request)
-		cancel()
-		if err == nil {
-			last = payload
-			if isTerminalStatus(payload) {
-				return payload, nil
-			}
-		}
-
-		if time.Now().After(deadline) {
-			if last != nil {
-				return last, nil
-			}
-			if err != nil {
-				return nil, err
-			}
-			return nil, fmt.Errorf("timed out waiting for LI.FI execution status")
-		}
-		time.Sleep(interval)
-	}
-}
-
-func waitForPortfolioPosition(rt *runtime, walletAddress string, vault *earn.Vault, baseline []map[string]any, expectedDelta float64, interval, timeout time.Duration) (bool, []map[string]any, error) {
-	if interval <= 0 {
-		interval = 5 * time.Second
-	}
-	if timeout <= 0 {
-		timeout = time.Minute
-	}
-
-	deadline := time.Now().Add(timeout)
-	var last []map[string]any
-	baselineTotal := portfolioBalanceForVaultAsset(baseline, *vault)
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		portfolio, err := rt.earnClient.GetPortfolio(ctx, walletAddress)
-		cancel()
-		if err == nil {
-			last = portfolio.Positions
-			if portfolioShowsDeposit(portfolio.Positions, *vault, baselineTotal, expectedDelta) {
-				return true, portfolio.Positions, nil
-			}
-		}
-
-		if time.Now().After(deadline) {
-			if last != nil {
-				return portfolioShowsDeposit(last, *vault, baselineTotal, expectedDelta), last, nil
-			}
-			if err != nil {
-				return false, nil, err
-			}
-			return false, nil, fmt.Errorf("timed out waiting for portfolio update")
-		}
-		time.Sleep(interval)
-	}
-}
-
-func portfolioShowsDeposit(positions []map[string]any, vault earn.Vault, baselineTotal, expectedDelta float64) bool {
-	if findVaultInPositions(positions, vault) {
-		return true
-	}
-
-	currentTotal := portfolioBalanceForVaultAsset(positions, vault)
-	delta := currentTotal - baselineTotal
-	if delta <= 0 {
-		return false
-	}
-	if expectedDelta <= 0 {
-		return true
-	}
-	return delta >= expectedDelta*0.5
+	printTable([]string{"field", "value"}, [][]string{
+		{"wallet", preflight.WalletAddress},
+		{"source chain", preflight.SourceChain},
+		{"source token", preflight.SourceToken},
+		{"source amount", preflight.SourceAmount},
+		{"vault", preflight.DestinationVault},
+		{"expected received", preflight.ExpectedReceived},
+		{"approval address", emptyFallback(preflight.ApprovalAddress)},
+		{"approval needed", boolText(preflight.ApprovalNeeded)},
+		{"approval amount", preflight.ApprovalAmount},
+		{"gas policy", preflight.GasPolicy},
+		{"token balance", preflight.TokenBalanceFormatted},
+		{"native balance", preflight.NativeBalanceFormatted},
+		{"estimated gas cost", preflight.EstimatedGasFormatted},
+	})
 }

@@ -537,3 +537,14 @@ func positionMatchesVault(position map[string]any, protocol string, chainID int,
 func commonAddress(value string) common.Address {
 	return common.HexToAddress(value)
 }
+
+func explorerTxURL(chain *lifiapi.Chain, txHash string) string {
+	if chain == nil || txHash == "" {
+		return ""
+	}
+	if len(chain.Metamask.BlockExplorerURLs) == 0 || chain.Metamask.BlockExplorerURLs[0] == "" {
+		return ""
+	}
+	base := strings.TrimRight(chain.Metamask.BlockExplorerURLs[0], "/")
+	return base + "/tx/" + txHash
+}

@@ -38,6 +38,10 @@ type FeeEstimate struct {
 	Dynamic       bool
 }
 
+type SendOptions struct {
+	GasPolicy string
+}
+
 func WalletFromHex(privateKeyHex string) (*Wallet, error) {
 	privateKeyHex = strings.TrimPrefix(strings.TrimSpace(privateKeyHex), "0x")
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
@@ -138,18 +142,13 @@ func Allowance(ctx context.Context, client *ethclient.Client, tokenAddress strin
 	return allowance, nil
 }
 
-func Approve(ctx context.Context, client *ethclient.Client, wallet *Wallet, chainID *big.Int, tokenAddress string, spender common.Address, amount *big.Int) (common.Hash, error) {
+func Approve(ctx context.Context, client *ethclient.Client, wallet *Wallet, chainID int, tokenAddress string, spender common.Address, amount *big.Int, gasPolicy string) (common.Hash, error) {
 	parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
 	if err != nil {
 		return common.Hash{}, err
 	}
 
 	data, err := parsedABI.Pack("approve", spender, amount)
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	gasPrice, err := client.SuggestGasPrice(ctx)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -169,16 +168,13 @@ func Approve(ctx context.Context, client *ethclient.Client, wallet *Wallet, chai
 		gasLimit = 65000
 	}
 
-	tx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		To:       &token,
-		Value:    big.NewInt(0),
-		Gas:      gasLimit,
-		GasPrice: gasPrice,
-		Data:     data,
-	})
+	fee, err := estimateFee(ctx, client, wallet.Address, &token, big.NewInt(0), data, gasLimit, nil, gasPolicy)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	tx := buildTransaction(big.NewInt(int64(chainID)), nonce, &token, big.NewInt(0), data, fee)
 
-	signed, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), wallet.PrivateKey)
+	signed, err := types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(int64(chainID))), wallet.PrivateKey)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -190,7 +186,7 @@ func Approve(ctx context.Context, client *ethclient.Client, wallet *Wallet, chai
 	return signed.Hash(), nil
 }
 
-func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet *Wallet, request lifiapi.TransactionRequest) (common.Hash, error) {
+func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet *Wallet, request lifiapi.TransactionRequest, gasPolicy string) (common.Hash, error) {
 	chainID := big.NewInt(int64(request.ChainID))
 	nonce, err := client.PendingNonceAt(ctx, wallet.Address)
 	if err != nil {
@@ -205,10 +201,6 @@ func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet 
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("parse gas price: %w", err)
 	}
-	suggestedGasPrice, err := client.SuggestGasPrice(ctx)
-	if err == nil && suggestedGasPrice.Cmp(gasPrice) > 0 {
-		gasPrice = suggestedGasPrice
-	}
 	gasLimit, err := parseUint64(request.GasLimit)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("parse gas limit: %w", err)
@@ -216,14 +208,11 @@ func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet 
 	data := common.FromHex(request.Data)
 	to := common.HexToAddress(request.To)
 
-	tx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		To:       &to,
-		Value:    value,
-		Gas:      gasLimit,
-		GasPrice: gasPrice,
-		Data:     data,
-	})
+	fee, err := estimateFee(ctx, client, wallet.Address, &to, value, data, gasLimit, gasPrice, gasPolicy)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	tx := buildTransaction(chainID, nonce, &to, value, data, fee)
 
 	signed, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), wallet.PrivateKey)
 	if err != nil {
@@ -235,6 +224,59 @@ func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet 
 	}
 
 	return signed.Hash(), nil
+}
+
+func SimulateQuoteTransaction(ctx context.Context, client *ethclient.Client, request lifiapi.TransactionRequest, from common.Address) (uint64, error) {
+	value, err := parseBigInt(request.Value)
+	if err != nil {
+		return 0, fmt.Errorf("parse tx value: %w", err)
+	}
+	to := common.HexToAddress(request.To)
+	return client.EstimateGas(ctx, ethereum.CallMsg{
+		From:  from,
+		To:    &to,
+		Value: value,
+		Data:  common.FromHex(request.Data),
+	})
+}
+
+func EstimateQuoteFee(ctx context.Context, client *ethclient.Client, from common.Address, request lifiapi.TransactionRequest, gasPolicy string) (*FeeEstimate, error) {
+	value, err := parseBigInt(request.Value)
+	if err != nil {
+		return nil, fmt.Errorf("parse tx value: %w", err)
+	}
+	gasPrice, err := parseBigInt(request.GasPrice)
+	if err != nil {
+		return nil, fmt.Errorf("parse gas price: %w", err)
+	}
+	gasLimit, err := parseUint64(request.GasLimit)
+	if err != nil {
+		return nil, fmt.Errorf("parse gas limit: %w", err)
+	}
+	to := common.HexToAddress(request.To)
+	return estimateFee(ctx, client, from, &to, value, common.FromHex(request.Data), gasLimit, gasPrice, gasPolicy)
+}
+
+func EstimateApprovalFee(ctx context.Context, client *ethclient.Client, wallet common.Address, tokenAddress string, spender common.Address, amount *big.Int, gasPolicy string) (*FeeEstimate, error) {
+	parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := parsedABI.Pack("approve", spender, amount)
+	if err != nil {
+		return nil, err
+	}
+	token := common.HexToAddress(tokenAddress)
+	gasLimit, err := client.EstimateGas(ctx, ethereum.CallMsg{
+		From: wallet,
+		To:   &token,
+		Data: data,
+	})
+	if err != nil {
+		gasLimit = 65000
+	}
+	return estimateFee(ctx, client, wallet, &token, big.NewInt(0), data, gasLimit, nil, gasPolicy)
 }
 
 func WaitForReceipt(ctx context.Context, client *ethclient.Client, txHash common.Hash, interval time.Duration) (*types.Receipt, error) {
@@ -290,4 +332,101 @@ func parseUint64(value string) (uint64, error) {
 		return 0, err
 	}
 	return bigValue.Uint64(), nil
+}
+
+func estimateFee(ctx context.Context, client *ethclient.Client, from common.Address, to *common.Address, value *big.Int, data []byte, requestedGasLimit uint64, requestedGasPrice *big.Int, gasPolicy string) (*FeeEstimate, error) {
+	policy := strings.ToLower(strings.TrimSpace(gasPolicy))
+	if policy == "" {
+		policy = "auto"
+	}
+
+	gasLimit := requestedGasLimit
+	if policy == "rpc" || policy == "auto" || gasLimit == 0 {
+		estimatedGas, err := client.EstimateGas(ctx, ethereum.CallMsg{
+			From:  from,
+			To:    to,
+			Value: value,
+			Data:  data,
+		})
+		if err == nil && estimatedGas > gasLimit {
+			gasLimit = estimatedGas
+		}
+	}
+	if gasLimit == 0 {
+		gasLimit = 21000
+	}
+
+	if policy != "quote" {
+		header, err := client.HeaderByNumber(ctx, nil)
+		if err == nil && header.BaseFee != nil {
+			tipCap, tipErr := client.SuggestGasTipCap(ctx)
+			if tipErr != nil || tipCap == nil || tipCap.Sign() <= 0 {
+				tipCap = big.NewInt(2_000_000_000)
+			}
+			feeCap := new(big.Int).Add(new(big.Int).Mul(header.BaseFee, big.NewInt(2)), tipCap)
+			if requestedGasPrice != nil && requestedGasPrice.Sign() > 0 && feeCap.Cmp(requestedGasPrice) < 0 {
+				feeCap = new(big.Int).Set(requestedGasPrice)
+			}
+			return &FeeEstimate{
+				GasLimit:      gasLimit,
+				GasTipCap:     tipCap,
+				GasFeeCap:     feeCap,
+				EstimatedCost: new(big.Int).Mul(feeCap, new(big.Int).SetUint64(gasLimit)),
+				Dynamic:       true,
+			}, nil
+		}
+	}
+
+	gasPrice := requestedGasPrice
+	suggestedGasPrice, err := client.SuggestGasPrice(ctx)
+	if err == nil && suggestedGasPrice != nil {
+		switch policy {
+		case "rpc":
+			gasPrice = suggestedGasPrice
+		case "auto":
+			if gasPrice == nil || gasPrice.Sign() <= 0 || suggestedGasPrice.Cmp(gasPrice) > 0 {
+				gasPrice = suggestedGasPrice
+			}
+		}
+	}
+	if gasPrice == nil || gasPrice.Sign() <= 0 {
+		gasPrice = big.NewInt(0)
+	}
+
+	return &FeeEstimate{
+		GasLimit:      gasLimit,
+		GasPrice:      gasPrice,
+		EstimatedCost: new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit)),
+	}, nil
+}
+
+func buildTransaction(chainID *big.Int, nonce uint64, to *common.Address, value *big.Int, data []byte, fee *FeeEstimate) *types.Transaction {
+	if fee != nil && fee.Dynamic {
+		return types.NewTx(&types.DynamicFeeTx{
+			ChainID:   chainID,
+			Nonce:     nonce,
+			To:        to,
+			Value:     value,
+			Gas:       fee.GasLimit,
+			GasTipCap: fee.GasTipCap,
+			GasFeeCap: fee.GasFeeCap,
+			Data:      data,
+		})
+	}
+	gasPrice := big.NewInt(0)
+	if fee != nil && fee.GasPrice != nil {
+		gasPrice = fee.GasPrice
+	}
+	gasLimit := uint64(0)
+	if fee != nil {
+		gasLimit = fee.GasLimit
+	}
+	return types.NewTx(&types.LegacyTx{
+		Nonce:    nonce,
+		To:       to,
+		Value:    value,
+		Gas:      gasLimit,
+		GasPrice: gasPrice,
+		Data:     data,
+	})
 }

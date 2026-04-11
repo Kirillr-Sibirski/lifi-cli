@@ -28,7 +28,7 @@ func (quoteCommand) Run(cfg *config.Config, args []string) error {
 	fs := newFlagSet("quote")
 	var vaultArg, fromChainArg, toChainArg, fromTokenArg, amount, amountWei, fromAddress, toAddress string
 	var slippageBps, preset, allowBridges, denyBridges, allowExchanges, denyExchanges string
-	var raw bool
+	var raw, unsigned bool
 	fs.StringVar(&vaultArg, "vault", "", "Target vault address")
 	fs.StringVar(&fromChainArg, "from-chain", "", "Source chain")
 	fs.StringVar(&toChainArg, "to-chain", "", "Destination chain")
@@ -44,6 +44,7 @@ func (quoteCommand) Run(cfg *config.Config, args []string) error {
 	fs.StringVar(&allowExchanges, "allow-exchanges", "", "Allowlisted exchanges")
 	fs.StringVar(&denyExchanges, "deny-exchanges", "", "Denylisted exchanges")
 	fs.BoolVar(&raw, "raw", false, "Print raw transaction payload details")
+	fs.BoolVar(&unsigned, "unsigned", false, "Print the unsigned transaction payload for external signing")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -75,10 +76,28 @@ func (quoteCommand) Run(cfg *config.Config, args []string) error {
 				"transactionRequest": quote.TransactionRequest,
 			})
 		}
+		if unsigned {
+			return writeJSON(map[string]any{
+				"quote":                quote,
+				"unsigned_transaction": quote.TransactionRequest,
+				"stage":                "quote",
+				"status":               "ok",
+				"message":              "unsigned transaction prepared",
+			})
+		}
 		return writeJSON(quote)
 	}
 
 	printTable([]string{"field", "value"}, quoteSummaryRows(quote))
+	if unsigned {
+		fmt.Println()
+		fmt.Println("unsigned transaction")
+		blob, err := prettyJSON(quote.TransactionRequest)
+		if err != nil {
+			return err
+		}
+		fmt.Println(blob)
+	}
 	if raw {
 		fmt.Println()
 		fmt.Println("transaction request")
