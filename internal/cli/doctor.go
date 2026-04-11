@@ -59,8 +59,8 @@ func (doctorCommand) Run(cfg *config.Config, args []string) error {
 	}
 
 	checks := []doctorCheck{
-		httpCheck("earn.li.fi", "https://earn.li.fi"),
-		httpCheck("li.quest", "https://li.quest/v1/info"),
+		httpCheck("earn.li.fi", "https://earn.li.fi/v1/earn/chains"),
+		httpCheck("li.quest", "https://li.quest/v1/chains"),
 		envCheck("LIFI_API_KEY", cfg.APIKey),
 		dotEnvCheck(cfg),
 		configPathCheck(cfg),

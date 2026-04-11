@@ -448,14 +448,86 @@ func uniqueStrings(values []string) []string {
 	return result
 }
 
-func findVaultInPositions(positions []map[string]any, vaultAddress string) bool {
-	needle := strings.ToLower(vaultAddress)
+func findVaultInPositions(positions []map[string]any, vault earn.Vault) bool {
+	needleAddress := strings.ToLower(vault.Address)
+	needleProtocol := normalizeLookup(vault.Protocol.Name)
+	assetNeedles := uniqueStrings(vaultAssetNeedles(vault))
+
 	for _, position := range positions {
+		if positionMatchesVault(position, needleProtocol, vault.ChainID, assetNeedles) {
+			return true
+		}
+
 		blob, err := json.Marshal(position)
 		if err != nil {
 			continue
 		}
-		if strings.Contains(strings.ToLower(string(blob)), needle) {
+		if strings.Contains(strings.ToLower(string(blob)), needleAddress) {
+			return true
+		}
+	}
+	return false
+}
+
+func portfolioBalanceForVaultAsset(positions []map[string]any, vault earn.Vault) float64 {
+	assetNeedles := uniqueStrings(vaultAssetNeedles(vault))
+	total := 0.0
+	for _, position := range positions {
+		if !positionMatchesVault(position, "", vault.ChainID, assetNeedles) {
+			continue
+		}
+		total += parseFloat(fmt.Sprint(position["balanceNative"]))
+	}
+	return total
+}
+
+func vaultAssetNeedles(vault earn.Vault) []string {
+	values := make([]string, 0, len(vault.UnderlyingTokens)*2+len(vault.LPTokens)*2)
+	for _, token := range vault.UnderlyingTokens {
+		values = append(values, token.Address, token.Symbol)
+	}
+	for _, token := range vault.LPTokens {
+		values = append(values, token.Address, token.Symbol)
+	}
+	return values
+}
+
+func positionMatchesVault(position map[string]any, protocol string, chainID int, assets []string) bool {
+	if protocol != "" && normalizeLookup(fmt.Sprint(position["protocolName"])) != protocol {
+		return false
+	}
+
+	switch value := position["chainId"].(type) {
+	case float64:
+		if int(value) != chainID {
+			return false
+		}
+	case int:
+		if value != chainID {
+			return false
+		}
+	case string:
+		if parseMaybeInt(value) != chainID {
+			return false
+		}
+	}
+
+	if len(assets) == 0 {
+		return true
+	}
+
+	asset, ok := position["asset"].(map[string]any)
+	if !ok {
+		return false
+	}
+	address := normalizeLookup(fmt.Sprint(asset["address"]))
+	symbol := normalizeLookup(fmt.Sprint(asset["symbol"]))
+	for _, candidate := range assets {
+		candidate = normalizeLookup(candidate)
+		if candidate == "" {
+			continue
+		}
+		if candidate == address || candidate == symbol {
 			return true
 		}
 	}

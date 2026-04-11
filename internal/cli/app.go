@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -61,22 +60,44 @@ func Run(args []string) int {
 }
 
 func parseGlobalOptions(args []string) (config.GlobalOptions, []string, error) {
-	fs := flag.NewFlagSet("lifi", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	global := config.GlobalOptions{
+		Profile: "default",
+	}
+	remaining := make([]string, 0, len(args))
 
-	var global config.GlobalOptions
-	fs.StringVar(&global.ConfigPath, "config", "", "Path to the config file")
-	fs.StringVar(&global.Profile, "profile", "default", "Config profile name")
-	fs.BoolVar(&global.JSON, "json", false, "Print machine-readable JSON output")
-	fs.BoolVar(&global.Verbose, "verbose", false, "Enable verbose output")
-	fs.BoolVar(&global.Quiet, "quiet", false, "Reduce non-essential output")
-	fs.BoolVar(&global.NoColor, "no-color", false, "Disable ANSI color output")
-
-	if err := fs.Parse(args); err != nil {
-		return config.GlobalOptions{}, nil, err
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--config":
+			if i+1 >= len(args) {
+				return config.GlobalOptions{}, nil, fmt.Errorf("missing value for --config")
+			}
+			i++
+			global.ConfigPath = args[i]
+		case strings.HasPrefix(arg, "--config="):
+			global.ConfigPath = strings.TrimPrefix(arg, "--config=")
+		case arg == "--profile":
+			if i+1 >= len(args) {
+				return config.GlobalOptions{}, nil, fmt.Errorf("missing value for --profile")
+			}
+			i++
+			global.Profile = args[i]
+		case strings.HasPrefix(arg, "--profile="):
+			global.Profile = strings.TrimPrefix(arg, "--profile=")
+		case arg == "--json":
+			global.JSON = true
+		case arg == "--verbose":
+			global.Verbose = true
+		case arg == "--quiet":
+			global.Quiet = true
+		case arg == "--no-color":
+			global.NoColor = true
+		default:
+			remaining = append(remaining, arg)
+		}
 	}
 
-	return global, fs.Args(), nil
+	return global, remaining, nil
 }
 
 func builtInCommands() map[string]Command {
@@ -147,8 +168,8 @@ func printRootUsage(commands map[string]Command) {
 	fmt.Println("Run `lifi <command> --help` for command details.")
 }
 
-func newFlagSet(name string) *flag.FlagSet {
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+func newFlagSet(name string) *FlagSet {
+	fs := NewFlagSet(name)
 	fs.SetOutput(os.Stderr)
 	return fs
 }

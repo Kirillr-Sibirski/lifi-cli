@@ -196,6 +196,10 @@ func SendQuoteTransaction(ctx context.Context, client *ethclient.Client, wallet 
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("parse gas price: %w", err)
 	}
+	suggestedGasPrice, err := client.SuggestGasPrice(ctx)
+	if err == nil && suggestedGasPrice.Cmp(gasPrice) > 0 {
+		gasPrice = suggestedGasPrice
+	}
 	gasLimit, err := parseUint64(request.GasLimit)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("parse gas limit: %w", err)

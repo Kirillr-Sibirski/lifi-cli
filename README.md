@@ -405,6 +405,8 @@ All commands support:
 - `--quiet`
 - `--no-color`
 
+Global flags can be placed before or after the command name.
+
 ## Configuration
 
 `lifi` reads configuration from flags, environment variables, and a local config file.
@@ -517,11 +519,11 @@ Implemented and live-tested:
 - `portfolio`
 - `deposit --dry-run`
 - `completion`
-
-Implemented but not live-tested in this repo session because they require a real wallet key:
-
 - `approve`
-- `deposit`
+- `deposit --wait`
+- `deposit --verify-position`
+
+Live wallet testing in this repo session used tiny Optimism mainnet deposits to validate approval, execution, receipt handling, and portfolio verification.
 
 Release scaffolding is also in place for macOS and Linux builds through GoReleaser.
 

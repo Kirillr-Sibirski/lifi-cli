@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/config"
+	"github.com/Kirillr-Sibirski/lifi-cli/internal/earn"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/evm"
 	"github.com/Kirillr-Sibirski/lifi-cli/internal/lifiapi"
 )
@@ -286,6 +287,16 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 	ctx, cancel := rt.context()
 	defer cancel()
 
+	var baselinePositions []map[string]any
+	if verifyPosition {
+		verifyCtx, verifyCancel := context.WithTimeout(context.Background(), 20*time.Second)
+		portfolio, err := rt.earnClient.GetPortfolio(verifyCtx, walletAddress)
+		verifyCancel()
+		if err == nil {
+			baselinePositions = portfolio.Positions
+		}
+	}
+
 	rpcURL, err := rt.rpcURL(fromChain)
 	if err != nil {
 		return err
@@ -436,7 +447,8 @@ func (depositCommand) Run(cfg *config.Config, args []string) error {
 		if err != nil {
 			return err
 		}
-		found, positions, err := waitForPortfolioPosition(rt, walletAddress, vault.Address, 5*time.Second, time.Minute)
+		expectedDelta := parseFloat(formatAmount(quote.Estimate.ToAmount, quote.Action.ToToken.Decimals, 9))
+		found, positions, err := waitForPortfolioPosition(rt, walletAddress, vault, baselinePositions, expectedDelta, 5*time.Second, time.Minute)
 		if err != nil {
 			return err
 		}
@@ -486,7 +498,7 @@ func waitForExecutionStatus(rt *runtime, request lifiapi.StatusRequest, interval
 	}
 }
 
-func waitForPortfolioPosition(rt *runtime, walletAddress, vaultAddress string, interval, timeout time.Duration) (bool, []map[string]any, error) {
+func waitForPortfolioPosition(rt *runtime, walletAddress string, vault *earn.Vault, baseline []map[string]any, expectedDelta float64, interval, timeout time.Duration) (bool, []map[string]any, error) {
 	if interval <= 0 {
 		interval = 5 * time.Second
 	}
@@ -496,20 +508,21 @@ func waitForPortfolioPosition(rt *runtime, walletAddress, vaultAddress string, i
 
 	deadline := time.Now().Add(timeout)
 	var last []map[string]any
+	baselineTotal := portfolioBalanceForVaultAsset(baseline, *vault)
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		portfolio, err := rt.earnClient.GetPortfolio(ctx, walletAddress)
 		cancel()
 		if err == nil {
 			last = portfolio.Positions
-			if findVaultInPositions(portfolio.Positions, vaultAddress) {
+			if portfolioShowsDeposit(portfolio.Positions, *vault, baselineTotal, expectedDelta) {
 				return true, portfolio.Positions, nil
 			}
 		}
 
 		if time.Now().After(deadline) {
 			if last != nil {
-				return findVaultInPositions(last, vaultAddress), last, nil
+				return portfolioShowsDeposit(last, *vault, baselineTotal, expectedDelta), last, nil
 			}
 			if err != nil {
 				return false, nil, err
@@ -518,4 +531,20 @@ func waitForPortfolioPosition(rt *runtime, walletAddress, vaultAddress string, i
 		}
 		time.Sleep(interval)
 	}
+}
+
+func portfolioShowsDeposit(positions []map[string]any, vault earn.Vault, baselineTotal, expectedDelta float64) bool {
+	if findVaultInPositions(positions, vault) {
+		return true
+	}
+
+	currentTotal := portfolioBalanceForVaultAsset(positions, vault)
+	delta := currentTotal - baselineTotal
+	if delta <= 0 {
+		return false
+	}
+	if expectedDelta <= 0 {
+		return true
+	}
+	return delta >= expectedDelta*0.5
 }
