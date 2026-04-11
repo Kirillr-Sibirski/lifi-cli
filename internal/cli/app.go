@@ -176,6 +176,7 @@ func printRootUsage(commands map[string]Command, noColor bool) {
 
 	fmt.Println()
 	fmt.Println(subtleValue("Run `lifi <command> --help` for command details.", noColor))
+	fmt.Println(subtleValue("Issues and docs: https://github.com/Kirillr-Sibirski/lifi-cli", noColor))
 }
 
 func newFlagSet(name string) *FlagSet {
