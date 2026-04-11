@@ -4,8 +4,13 @@ All notable changes to `lifi` are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-11
+
 - Added stronger `doctor` checks for wallet/address consistency, live RPC chain
   detection, and native gas balance readiness.
+- Fixed the write-path simulation bug so first-time deposits skip transaction
+  simulation until approval is granted instead of failing with
+  `TRANSFER_FROM_FAILED`.
 - Added a release helper script, operations runbook, Makefile targets, and
   licensing/changelog metadata.
 
