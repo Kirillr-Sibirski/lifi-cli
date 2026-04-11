@@ -1,6 +1,8 @@
 # lifi-cli
 
-**`lifi`** is a command-line tool for [LI.FI](https://li.fi) — discover yield vaults, generate cross-chain deposit quotes, and execute on-chain transactions from your terminal.
+> **GitHub:** [Kirillr-Sibirski/lifi-cli](https://github.com/Kirillr-Sibirski/lifi-cli) · Docs and issues live there.
+
+**`lifi`** is a CLI wrapper around the [LI.FI REST API](https://apidocs.li.fi) — it turns vault discovery, cross-chain routing quotes, ERC-20 approvals, and on-chain deposits into single terminal commands with no custom SDK required.
 
 ```
 lifi vaults --chain base --asset USDC --sort apy --limit 5
