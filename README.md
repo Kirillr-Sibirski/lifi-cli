@@ -24,28 +24,6 @@ cd lifi-cli
 go build -o bin/lifi ./cmd/lifi
 ```
 
-## Docs frontend
-
-A deployable docs site lives in [`frontend/`](./frontend). It renders the root
-markdown docs in a minimal docs-first layout and is ready to deploy on Vercel.
-
-```bash
-cd frontend
-bun install
-bun run dev
-```
-
-## Repository map
-
-- `cmd/lifi/` — CLI entrypoint
-- `internal/cli/` — command handlers and terminal presentation
-- `internal/flow/` — deposit and portfolio orchestration
-- `internal/earn/` — Earn API client
-- `internal/lifiapi/` — Composer / LI.FI API client
-- `internal/evm/` — on-chain signing and transaction helpers
-- `docs/` — authored product and ops documentation
-- `frontend/` — deployable docs site built from the markdown docs
-
 ---
 
 ## Setup

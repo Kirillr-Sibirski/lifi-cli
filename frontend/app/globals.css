@@ -132,7 +132,6 @@ samp {
 }
 
 .sidebar-card,
-.sidebar-examples,
 .docs-article-shell,
 .pager-card,
 .copy-button {
@@ -142,8 +141,17 @@ samp {
 }
 
 .sidebar-card,
-.sidebar-examples {
+.sidebar-card {
   padding: 1rem;
+}
+
+.sidebar-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .sidebar-card h2,
@@ -154,31 +162,13 @@ samp {
 
 .sidebar-kicker,
 .sidebar-section-title,
-.eyebrow,
-.examples-title {
+.eyebrow {
   margin: 0 0 0.75rem;
   color: var(--accent-soft);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-}
-
-.sidebar-examples {
-  margin-top: 1rem;
-}
-
-.example-command {
-  display: block;
-  margin-top: 0.7rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-code);
-  color: var(--text);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
 }
 
 .sidebar-section + .sidebar-section {
