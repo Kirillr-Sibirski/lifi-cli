@@ -5,17 +5,19 @@ import (
 	"strings"
 )
 
-// lifiBannerLines is the "li.fi cli" logo in DOS Rebel block-font style.
-var lifiBannerLines = []string{
-	`█████        ███  ███████████  ███       █████████  █████       █████`,
-	`░░███        ░░░  ░░███░░░░░░█ ░░░       ███░░░░░███░░███       ░░███ `,
-	` ░███        ████  ░███   █ ░  ████     ███     ░░░  ░███        ░███ `,
-	` ░███       ░░███  ░███████   ░░███    ░███          ░███        ░███ `,
-	` ░███        ░███  ░███░░░█    ░███    ░███          ░███        ░███ `,
-	` ░███      █ ░███  ░███  ░     ░███    ░░███     ███ ░███      █ ░███ `,
-	` ███████████ █████ █████       █████    ░░█████████  ███████████ █████`,
-	`░░░░░░░░░░░ ░░░░░ ░░░░░       ░░░░░      ░░░░░░░░░  ░░░░░░░░░░░ ░░░░░`,
-}
+const lifiBanner = `
+   ██████                     ██████
+  ████████━━━━━━━━━━━━━━━━━━━████████
+  ████████  c r o s s ─ c h a i n
+  ████████━━━━━━━━━━━━━━━━━━━████████
+   ██████                     ██████
+
+ __    ___ _____ ___    ____ _     ___
+|  |  |_ _|  ___|_ _|  / ___| |   |_ _|
+|  |   | || |_   | |  | |   | |    | |
+|  |___| ||  _|  | |  | |___| |___ | |
+|______|___|_|   |___|  \____|_____|___|
+`
 
 func colorize(value, code string, noColor bool) string {
 	if noColor || strings.TrimSpace(value) == "" {
@@ -25,25 +27,33 @@ func colorize(value, code string, noColor bool) string {
 }
 
 func brandBanner(noColor bool) string {
-	tagline := "li.fi cli | earn + composer for builders"
 	if noColor {
-		return strings.Join(lifiBannerLines, "\n") + "\n" + tagline + "\n"
+		banner := strings.TrimLeft(lifiBanner, "\n")
+		return banner + "li.fi cli | earn + composer for builders\n"
 	}
 
 	p1 := func(s string) string { return colorize(s, "38;5;213;1", false) }
 	p2 := func(s string) string { return colorize(s, "38;5;205;1", false) }
+	dim := func(s string) string { return colorize(s, "90", false) }
 
-	colored := make([]string, len(lifiBannerLines))
-	for i, line := range lifiBannerLines {
-		if i%2 == 0 {
-			colored[i] = p1(line)
-		} else {
-			colored[i] = p2(line)
-		}
-	}
+	bridge := strings.Join([]string{
+		"   " + p1("██████") + "                     " + p1("██████"),
+		"  " + p2("████████") + dim("━━━━━━━━━━━━━━━━━━━") + p2("████████"),
+		"  " + p2("████████") + "  " + dim("c r o s s ─ c h a i n"),
+		"  " + p2("████████") + dim("━━━━━━━━━━━━━━━━━━━") + p2("████████"),
+		"   " + p1("██████") + "                     " + p1("██████"),
+	}, "\n")
 
-	styledTagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| earn + composer for builders", "38;5;250", false)
-	return strings.Join(colored, "\n") + "\n" + styledTagline + "\n"
+	logo := strings.Join([]string{
+		p1(` __    ___ _____ ___    ____ _     ___`),
+		p2(`|  |  |_ _|  ___|_ _|  / ___| |   |_ _|`),
+		p1(`|  |   | || |_   | |  | |   | |    | |`),
+		p2(`|  |___| ||  _|  | |  | |___| |___ | |`),
+		p1(`|______|___|_|   |___|  \____|_____|___|`),
+	}, "\n")
+
+	tagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| earn + composer for builders", "38;5;250", false)
+	return bridge + "\n\n" + logo + "\n" + tagline + "\n"
 }
 
 func sectionTitle(title string, noColor bool) string {
