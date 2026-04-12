@@ -12,17 +12,8 @@ export function DocsSidebar({ activeSlug }: DocsSidebarProps) {
   return (
     <aside className="docs-sidebar">
       <div className="sidebar-card">
-        <img
-          src="/logo.png"
-          alt="lifi-cli logo"
-          className="sidebar-logo"
-        />
-        <p className="sidebar-kicker">Documentation</p>
-        <h2>LI.FI CLI</h2>
-        <p>
-          Installation, Earn, Composer, config, and operational docs for the{" "}
-          <code>lifi</code> CLI.
-        </p>
+        <img src="/logo.png" alt="lifi-cli logo" className="sidebar-logo" />
+        <p className="sidebar-kicker">LI.FI CLI</p>
       </div>
 
       <nav className="sidebar-nav" aria-label="Documentation">
@@ -39,7 +30,6 @@ export function DocsSidebar({ activeSlug }: DocsSidebarProps) {
                       href={`/docs/${doc.slug}`}
                     >
                       <span>{doc.title}</span>
-                      <small>{doc.description}</small>
                     </Link>
                   </li>
                 );
