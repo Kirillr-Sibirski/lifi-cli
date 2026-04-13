@@ -382,13 +382,9 @@ func boolText(value bool) string {
 	return "no"
 }
 
-// truncateAddr shortens a 0x… address to "0x<6hex>…<4hex>" for table display.
+// truncateAddr preserves full addresses so CLI output remains copyable.
 func truncateAddr(addr string) string {
-	s := strings.TrimSpace(addr)
-	if len(s) < 14 || !strings.HasPrefix(strings.ToLower(s), "0x") {
-		return s
-	}
-	return s[:8] + "…" + s[len(s)-4:]
+	return strings.TrimSpace(addr)
 }
 
 // truncateStr shortens a string to at most maxLen chars, appending "…" if cut.

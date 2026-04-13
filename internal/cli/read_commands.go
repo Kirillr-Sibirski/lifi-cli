@@ -562,7 +562,7 @@ func (portfolioCommand) Run(cfg *config.Config, args []string) error {
 		rows = append(rows, portfolioSummaryRow(index+1, position, chainNames))
 	}
 	printSectionHeader("Portfolio", cfg.Global.NoColor)
-	printTable([]string{"#", "chain", "protocol", "asset", "balance", "value"}, rows)
+	printTable([]string{"#", "chain", "protocol", "asset", "address", "balance", "value"}, rows)
 	if cfg.Global.Verbose {
 		for index, position := range filtered {
 			fmt.Printf("\n[%d]\n", index+1)
@@ -863,6 +863,7 @@ func portfolioSummaryRow(index int, position map[string]any, chainNames map[stri
 		chainLabelForPosition(position, chainNames),
 		nilSafe(position["protocolName"]),
 		assetSymbol,
+		portfolioAddress(position),
 		nilSafe(position["balanceNative"]),
 		valueStr,
 	}
@@ -889,6 +890,20 @@ func chainLabelForPosition(position map[string]any, chainNames map[string]string
 		return name
 	}
 	return chainID
+}
+
+func portfolioAddress(position map[string]any) string {
+	for _, key := range []string{"address", "vaultAddress", "tokenAddress"} {
+		if value := strings.TrimSpace(fmt.Sprint(position[key])); value != "" && value != "<nil>" {
+			return value
+		}
+	}
+	if asset, ok := position["asset"].(map[string]any); ok {
+		if value := strings.TrimSpace(fmt.Sprint(asset["address"])); value != "" && value != "<nil>" {
+			return value
+		}
+	}
+	return "-"
 }
 
 func statusSummaryRows(payload map[string]any) [][]string {
