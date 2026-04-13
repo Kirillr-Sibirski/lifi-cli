@@ -32,6 +32,10 @@ lifi vaults --chain opt --asset USDC --transactional-only --sort apy --limit 5
 The docs app lives in `/frontend`, and the authored markdown lives in
 `/frontend/content`.
 
+Hosted docs:
+
+- [lifi-cli.vercel.app/docs/getting-started](https://lifi-cli.vercel.app/docs/getting-started)
+
 Useful entry points:
 
 - [getting-started.md](/Users/kirillrybkov/Desktop/lifi/frontend/content/getting-started.md)
