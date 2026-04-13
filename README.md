@@ -1,5 +1,7 @@
 # lifi-cli
 
+![lifi-cli logo](assets/readme-logo.png)
+
 [![license: apache-2.0](https://img.shields.io/badge/license-apache%202.0-4b5563.svg)](https://github.com/Kirillr-Sibirski/lifi-cli/blob/main/LICENSE)
 [![version: 0.1.6](https://img.shields.io/badge/version-0.1.6-f472b6.svg)](https://github.com/Kirillr-Sibirski/lifi-cli/releases)
 
