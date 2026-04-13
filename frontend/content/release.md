@@ -6,19 +6,18 @@ the Homebrew tap.
 ## Release flow
 
 1. Run the verification checklist in [operations.md](operations.md).
-2. Update [CHANGELOG.md](../../CHANGELOG.md).
-3. Commit and push `main`.
-4. Tag a semantic version like `v0.1.1`.
-5. Push the tag.
-6. GitHub Actions runs GoReleaser and publishes archives plus `checksums.txt`.
-7. Update the stable Homebrew formula:
+2. Commit and push `main`.
+3. Tag a semantic version like `v0.1.1`.
+4. Push the tag.
+5. GitHub Actions runs GoReleaser and publishes archives plus `checksums.txt`.
+6. Update the stable Homebrew formula:
 
    ```bash
    ./scripts/update_formula.sh v0.1.1
    ```
 
-8. Commit the formula update and push `main`.
-9. Verify the release page and install flow.
+7. Commit the formula update and push `main`.
+8. Verify the release page and install flow.
 
 ## GitHub release automation
 

@@ -62,13 +62,6 @@
       "description": "GitHub Releases, Homebrew packaging, and stable install verification.",
       "section": "Operations",
       "source": "frontend/content/release.md"
-    },
-    {
-      "slug": "changelog",
-      "title": "Changelog",
-      "description": "Release notes and product changes across public versions.",
-      "section": "Operations",
-      "source": "CHANGELOG.md"
     }
   ]
 }

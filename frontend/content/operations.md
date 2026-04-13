@@ -15,15 +15,14 @@ Use this document for the day-to-day operational checklist around `lifi`.
 
 ## Release checklist
 
-1. Update `CHANGELOG.md`.
-2. Commit and push `main`.
-3. Tag the release: `git tag -a vX.Y.Z -m "vX.Y.Z"`.
-4. Push the tag: `git push origin vX.Y.Z`.
-5. Wait for the GitHub Release workflow to publish artifacts and checksums.
-6. Update the Homebrew formula:
+1. Commit and push `main`.
+2. Tag the release: `git tag -a vX.Y.Z -m "vX.Y.Z"`.
+3. Push the tag: `git push origin vX.Y.Z`.
+4. Wait for the GitHub Release workflow to publish artifacts and checksums.
+5. Update the Homebrew formula:
    `./scripts/update_formula.sh vX.Y.Z`
-7. Commit the formula update and push `main`.
-8. Verify install from a clean shell:
+6. Commit the formula update and push `main`.
+7. Verify install from a clean shell:
    `brew tap Kirillr-Sibirski/lifi-cli https://github.com/Kirillr-Sibirski/lifi-cli`
    `brew reinstall Kirillr-Sibirski/lifi-cli/lifi`
    `lifi version`
