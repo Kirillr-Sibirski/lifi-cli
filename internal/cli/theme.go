@@ -6,12 +6,6 @@ import (
 )
 
 const lifiBanner = `
-   ██████                     ██████
-  ████████━━━━━━━━━━━━━━━━━━━████████
-  ████████  c r o s s ─ c h a i n
-  ████████━━━━━━━━━━━━━━━━━━━████████
-   ██████                     ██████
-
  __    ___ _____ ___    ____ _     ___
 |  |  |_ _|  ___|_ _|  / ___| |   |_ _|
 |  |   | || |_   | |  | |   | |    | |
@@ -27,33 +21,21 @@ func colorize(value, code string, noColor bool) string {
 }
 
 func brandBanner(noColor bool) string {
+	banner := strings.TrimLeft(lifiBanner, "\n")
 	if noColor {
-		banner := strings.TrimLeft(lifiBanner, "\n")
-		return banner + "li.fi cli | earn + composer for builders\n"
+		return banner + "li.fi cli | discover, deposit, and track from your terminal\n"
 	}
-
-	p1 := func(s string) string { return colorize(s, "38;5;213;1", false) }
-	p2 := func(s string) string { return colorize(s, "38;5;205;1", false) }
-	dim := func(s string) string { return colorize(s, "90", false) }
-
-	bridge := strings.Join([]string{
-		"   " + p1("██████") + "                     " + p1("██████"),
-		"  " + p2("████████") + dim("━━━━━━━━━━━━━━━━━━━") + p2("████████"),
-		"  " + p2("████████") + "  " + dim("c r o s s ─ c h a i n"),
-		"  " + p2("████████") + dim("━━━━━━━━━━━━━━━━━━━") + p2("████████"),
-		"   " + p1("██████") + "                     " + p1("██████"),
-	}, "\n")
-
-	logo := strings.Join([]string{
-		p1(` __    ___ _____ ___    ____ _     ___`),
-		p2(`|  |  |_ _|  ___|_ _|  / ___| |   |_ _|`),
-		p1(`|  |   | || |_   | |  | |   | |    | |`),
-		p2(`|  |___| ||  _|  | |  | |___| |___ | |`),
-		p1(`|______|___|_|   |___|  \____|_____|___|`),
-	}, "\n")
-
-	tagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| earn + composer for builders", "38;5;250", false)
-	return bridge + "\n\n" + logo + "\n" + tagline + "\n"
+	lines := strings.Split(strings.TrimRight(banner, "\n"), "\n")
+	for i, line := range lines {
+		switch {
+		case i == 0 || i == len(lines)-1:
+			lines[i] = colorize(line, "38;5;213;1", false)
+		default:
+			lines[i] = colorize(line, "38;5;205;1", false)
+		}
+	}
+	tagline := colorize("li.fi cli", "97;1", false) + " " + colorize("| discover, deposit, and track from your terminal", "38;5;250", false)
+	return strings.Join(lines, "\n") + "\n" + tagline + "\n"
 }
 
 func sectionTitle(title string, noColor bool) string {
