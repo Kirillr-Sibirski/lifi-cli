@@ -25,7 +25,6 @@ export type DocPage = DocConfig & {
 };
 
 const REPO_URL = "https://github.com/Kirillr-Sibirski/lifi-cli";
-const contentDirectory = path.join(process.cwd(), "content");
 const docs = docsConfig.docs as DocConfig[];
 
 export function getDocs(): DocConfig[] {
@@ -56,14 +55,14 @@ export async function getDocPage(slug: string): Promise<DocPage | null> {
     return null;
   }
 
-  const filePath = path.join(contentDirectory, `${slug}.md`);
+  const filePath = path.resolve(process.cwd(), "..", doc.source);
   const content = await fs.readFile(filePath, "utf8");
 
   return {
     ...doc,
     content,
     headings: extractHeadings(content),
-    sourceUrl: `${REPO_URL}/blob/main/${doc.source.replace(/^\.\.\//, "")}`,
+    sourceUrl: `${REPO_URL}/blob/main/${doc.source}`,
   };
 }
 

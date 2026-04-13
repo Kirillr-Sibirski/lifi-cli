@@ -3,10 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "content:sync": "node ./scripts/sync-content.mjs",
-    "predev": "bun run content:sync",
     "dev": "next dev",
-    "prebuild": "bun run content:sync",
     "build": "next build",
     "start": "next start"
   },

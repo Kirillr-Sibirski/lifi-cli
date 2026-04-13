@@ -5,8 +5,8 @@ the Homebrew tap.
 
 ## Release flow
 
-1. Run the verification checklist in [docs/operations.md](operations.md).
-2. Update [CHANGELOG.md](../CHANGELOG.md).
+1. Run the verification checklist in [operations.md](operations.md).
+2. Update [CHANGELOG.md](../../CHANGELOG.md).
 3. Commit and push `main`.
 4. Tag a semantic version like `v0.1.1`.
 5. Push the tag.
